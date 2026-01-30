@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  gold-monitor:
+    build: .
+    container_name: gold-monitor
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./config.json:/app/config.json
+    environment:
+      - TZ=Asia/Shanghai
+    network_mode: bridge

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>黄金价格监控 | Gold Monitor</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>黄金价格监控</h1>
+            <div id="status-indicator" class="status connected">已连接</div>
+        </header>
+
+        <main>
+            <section class="price-card">
+                <div class="price-header">当前报价 (CNY/g)</div>
+                <div class="price-display">
+                    <div class="price-item">
+                        <span class="label">买入价</span>
+                        <span class="value" id="buy-price">--.--</span>
+                    </div>
+                    <div class="divider"></div>
+                    <div class="price-item">
+                        <span class="label">卖出价</span>
+                        <span class="value" id="sell-price">--.--</span>
+                    </div>
+                </div>
+                <div class="timestamp">更新时间: <span id="update-time">--:--:--</span></div>
+            </section>
+
+            <section class="config-section">
+                <h2>监控配置</h2>
+                <form id="config-form">
+                    <div class="form-group box-style">
+                        <label>轮询间隔 (毫秒)</label>
+                        <input type="number" id="interval" min="1000" step="1000">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group box-style">
+                            <label>低价预警 (≤)</label>
+                            <input type="number" id="lowThreshold" step="0.01">
+                        </div>
+                        <div class="form-group box-style">
+                            <label>高价预警 (≥)</label>
+                            <input type="number" id="highThreshold" step="0.01">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group box-style">
+                            <label>波动阈值 (%)</label>
+                            <input type="number" id="fluctuationThreshold" step="0.1">
+                        </div>
+                        <div class="form-group box-style">
+                            <label>波动窗口 (分钟)</label>
+                            <input type="number" id="fluctuationWindow" step="1">
+                        </div>
+                    </div>
+
+                    <div class="form-group box-style">
+                        <label>Bark 推送链接</label>
+                        <input type="text" id="barkUrl" placeholder="https://api.day.app/YOUR_KEY/">
+                        <button type="button" id="test-bark" class="secondary-btn">测试推送</button>
+                    </div>
+
+                    <button type="submit" class="primary-btn">保存配置</button>
+                </form>
+            </section>
+
+            <section class="log-section">
+                <h2>系统日志</h2>
+                <div id="log-container">
+                    <!-- Logs go here -->
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
