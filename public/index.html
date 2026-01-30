@@ -53,8 +53,15 @@
 
                     <div class="form-row">
                         <div class="form-group box-style">
-                            <label>波动阈值 (%)</label>
-                            <input type="number" id="fluctuationThreshold" step="0.1">
+                            <label>波动检测模式</label>
+                            <div class="radio-group">
+                                <label><input type="radio" name="fluctuationMode" value="percent" checked> 百分比 (%)</label>
+                                <label><input type="radio" name="fluctuationMode" value="value"> 数值 (元)</label>
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <label>阈值 <span id="threshold-unit">(%)</span></label>
+                                <input type="number" id="fluctuationThreshold" step="0.1">
+                            </div>
                         </div>
                         <div class="form-group box-style">
                             <label>波动窗口 (分钟)</label>

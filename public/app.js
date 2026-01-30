@@ -15,6 +15,8 @@ const inpHigh = document.getElementById('highThreshold');
 const inpFlucThresh = document.getElementById('fluctuationThreshold');
 const inpFlucWindow = document.getElementById('fluctuationWindow');
 const inpBark = document.getElementById('barkUrl');
+const radiosMode = document.getElementsByName('fluctuationMode');
+const elThresholdUnit = document.getElementById('threshold-unit');
 const btnTestBark = document.getElementById('test-bark');
 
 // State
@@ -79,6 +81,15 @@ socket.on('alert', (alert) => {
     addLog(`${alert.title}: ${alert.body}`, 'alert');
 });
 
+// UI Logic: Toggle Unit
+radiosMode.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            elThresholdUnit.textContent = e.target.value === 'percent' ? '(%)' : '(元)';
+        }
+    });
+});
+
 // Config Logic
 async function loadConfig() {
     try {
@@ -92,6 +103,14 @@ async function loadConfig() {
         inpFlucThresh.value = config.fluctuationThreshold;
         inpFlucWindow.value = config.fluctuationWindow;
         inpBark.value = config.barkUrl || '';
+
+        // Set Radio
+        const mode = config.fluctuationMode || 'percent'; // default
+        radiosMode.forEach(r => {
+            if (r.value === mode) r.checked = true;
+        });
+        elThresholdUnit.textContent = mode === 'percent' ? '(%)' : '(元)';
+
     } catch (err) {
         addLog('加载配置失败', 'alert');
     }
@@ -99,12 +118,17 @@ async function loadConfig() {
 
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    
+    let selectedMode = 'percent';
+    radiosMode.forEach(r => { if (r.checked) selectedMode = r.value; });
+
     const newConfig = {
         interval: parseInt(inpInterval.value),
         lowThreshold: parseFloat(inpLow.value),
         highThreshold: parseFloat(inpHigh.value),
         fluctuationThreshold: parseFloat(inpFlucThresh.value),
         fluctuationWindow: parseFloat(inpFlucWindow.value),
+        fluctuationMode: selectedMode,
         barkUrl: inpBark.value.trim()
     };
 

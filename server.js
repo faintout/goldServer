@@ -34,6 +34,7 @@ function loadConfig() {
                 highThreshold: 700,
                 fluctuationThreshold: 0.5,
                 fluctuationWindow: 5,
+                fluctuationMode: 'percent', // 'percent' or 'value'
                 barkUrl: ''
             };
             saveConfig();
@@ -57,17 +58,11 @@ function saveConfig() {
 async function sendBarkNotification(title, body) {
     if (!config.barkUrl) return;
     
-    // Ensure URL ends with slash if it's just the base, but usually Bark URLs are just the key or full URL to endpoint.
-    // Assuming config.barkUrl is the full URL like https://api.day.app/YOUR_KEY/
-    // We construct: https://api.day.app/YOUR_KEY/Title/Body
-    
     let url = config.barkUrl;
     if (!url.endsWith('/')) url += '/';
     
-    // Encode components
     const encodedTitle = encodeURIComponent(title);
     const encodedBody = encodeURIComponent(body);
-    
     
     const fullUrl = `${url}${encodedTitle}/${encodedBody}?group=GoldMonitor`;
 
@@ -86,7 +81,6 @@ function deObfuscate(str) {
 
 // Gold Price API
 const getGoldPrice = async () => {
-    // Encoded URL to prevent casual reading
     const _0x1a2b = 'aHR0cHM6Ly9tYm1vZHVsZS1vcGVuYXBpLnBhYXMuY21iY2hpbmEuY29tL3Byb2R1Y3QvdjEvZnVuYy9tYXJrZXQtY2VudGVy';
     const url = deObfuscate(_0x1a2b);
     
@@ -120,68 +114,6 @@ const getGoldPrice = async () => {
     return null;
 };
 
-// Monitor Logic
-function processPrice(data) {
-    const now = Date.now();
-    const currentPrice = parseFloat(data.zBuyPrc); // Use Buy Price for monitoring
-    
-    if (isNaN(currentPrice)) return;
-
-// 1. Check Thresholds
-    if (currentPrice <= config.lowThreshold) {
-        throttleAlert('价格过低预警', `当前价格 ${currentPrice} 低于设定阈值 ${config.lowThreshold}`);
-    } else if (currentPrice >= config.highThreshold) {
-        throttleAlert('价格过高预警', `当前价格 ${currentPrice} 高于设定阈值 ${config.highThreshold}`);
-    }
-
-    // 2. Check Fluctuations
-    cleanHistory(now);
-    
-    // Check against history BEFORE adding current point (to avoid comparing with self if added first, though logic handles it)
-    // Actually, plan says: compare current vs past.
-    const fluctuation = checkFluctuation(currentPrice);
-    
-    // Add current to history AFTER check? 
-    // If we add first, the loop includes current vs current (0%), which is fine.
-    // Let's add first to maintain standard history, but be careful with the reset.
-    priceHistory.push({ time: now, price: currentPrice });
-
-    if (fluctuation.triggered) {
-        const title = `价格${fluctuation.type}预警`;
-        const body = `幅度: ${fluctuation.percentChange}% (前值: ${fluctuation.oldPrice} -> 现值: ${fluctuation.currentPrice})`;
-        
-        // Send Alert Immediately
-        sendBarkNotification(title, body);
-        io.emit('alert', { title, body, time: now });
-        
-        // Critical: Reset History
-        // "触发了 预警及发生之后 清楚这个时间 按照一定时间重新计算"
-        console.log(`[波动触发] ${body} - 历史数据已清空`);
-        priceHistory = []; 
-    }
-
-    return {
-        ...data,
-        timestamp: now
-    };
-}
-
-// Renamed/Simplified: Just a wrapper now, logic moved to processPrice or simplified checks
-function throttleAlert(title, body) {
-    const now = Date.now();
-    // Keep threshold alerts throttled? 
-    // User request focused on "Surge/Plunge" logic cleanup ("Optimization of surge/plunge function").
-    // "No cooldown" request specifically mentioned "Pre-warning trigger".
-    // I will keep threshold throttling to avoid spam on every poll for static levels, 
-    // but Fluctuation alerts are now handled directly in processPrice WITHOUT throttle.
-    
-    if (now - lastAlertTime > 60000) { 
-        sendBarkNotification(title, body);
-        lastAlertTime = now;
-        io.emit('alert', { title, body, time: now });
-    }
-}
-
 function cleanHistory(now) {
     const windowMs = (config.fluctuationWindow || 5) * 60 * 1000;
     priceHistory = priceHistory.filter(p => now - p.time <= windowMs);
@@ -191,21 +123,29 @@ function checkFluctuation(currentPrice) {
     if (priceHistory.length < 1) return { triggered: false };
     
     const threshold = config.fluctuationThreshold || 0.5;
-    let maxDiffStats = null;
-    let maxPercent = 0;
+    const mode = config.fluctuationMode || 'percent'; // 'percent' | 'value'
 
-    // Check current price against ALL history points
+    let maxDiffStats = null;
+    let maxChange = 0; // percent or value
+
     for (const point of priceHistory) {
         const priceDiff = currentPrice - point.price;
-        const percentChange = (priceDiff / point.price) * 100;
+        let changeValue, changeMagnitude;
+
+        if (mode === 'value') {
+            changeValue = priceDiff;
+            changeMagnitude = Math.abs(priceDiff);
+        } else {
+            changeValue = (priceDiff / point.price) * 100;
+            changeMagnitude = Math.abs(changeValue);
+        }
         
-        if (Math.abs(percentChange) >= threshold) {
-            // Find the maximum deviation
-            if (!maxDiffStats || Math.abs(percentChange) > Math.abs(maxPercent)) {
-                maxPercent = percentChange;
+        if (changeMagnitude >= threshold) {
+            if (!maxDiffStats || changeMagnitude > Math.abs(maxChange)) {
+                maxChange = changeValue;
                 maxDiffStats = {
-                    type: percentChange > 0 ? '暴涨' : '暴跌',
-                    percentChange: percentChange.toFixed(2),
+                    type: changeValue > 0 ? '暴涨' : '暴跌',
+                    changeDisplay: mode === 'value' ? changeValue.toFixed(2) : `${changeValue.toFixed(2)}%`,
                     oldPrice: point.price,
                     currentPrice: currentPrice
                 };
@@ -218,6 +158,60 @@ function checkFluctuation(currentPrice) {
     }
     
     return { triggered: false };
+}
+
+// Monitor Logic
+function processPrice(data) {
+    const now = Date.now();
+    const currentPrice = parseFloat(data.zBuyPrc); // Use Buy Price for monitoring
+    
+    if (isNaN(currentPrice)) return;
+
+    // 1. Check Thresholds
+    if (currentPrice <= config.lowThreshold) {
+        throttleAlert('价格过低预警', `当前价格 ${currentPrice} 低于设定阈值 ${config.lowThreshold}`);
+    } else if (currentPrice >= config.highThreshold) {
+        throttleAlert('价格过高预警', `当前价格 ${currentPrice} 高于设定阈值 ${config.highThreshold}`);
+    }
+
+    // 2. Check Fluctuations
+    cleanHistory(now);
+    
+    const fluctuation = checkFluctuation(currentPrice);
+    
+    priceHistory.push({ time: now, price: currentPrice });
+
+    if (fluctuation.triggered) {
+        const title = `价格${fluctuation.type}预警`;
+        const body = `幅度: ${fluctuation.changeDisplay} (前值: ${fluctuation.oldPrice} -> 现值: ${fluctuation.currentPrice})`;
+        
+        // Send Alert Immediately
+        sendBarkNotification(title, body);
+        io.emit('alert', { title, body, time: now });
+        
+        console.log(`[波动触发] ${body} - 历史数据已清空`);
+        priceHistory = []; 
+    }
+
+    return {
+        ...data,
+        timestamp: now
+    };
+}
+
+
+// Renamed/Simplified: Just a wrapper now, logic moved to processPrice or simplified checks
+function throttleAlert(title, body) {
+    const now = Date.now();
+    // Keep threshold alerts throttled? 
+    // I will keep threshold throttling to avoid spam on every poll for static levels, 
+    // but Fluctuation alerts are now handled directly in processPrice WITHOUT throttle.
+    
+    if (now - lastAlertTime > 60000) { 
+        sendBarkNotification(title, body);
+        lastAlertTime = now;
+        io.emit('alert', { title, body, time: now });
+    }
 }
 
 // Scheduling
