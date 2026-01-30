@@ -127,7 +127,7 @@ function processPrice(data) {
     
     if (isNaN(currentPrice)) return;
 
-    // 1. Check Thresholds
+// 1. Check Thresholds
     if (currentPrice <= config.lowThreshold) {
         throttleAlert('价格过低预警', `当前价格 ${currentPrice} 低于设定阈值 ${config.lowThreshold}`);
     } else if (currentPrice >= config.highThreshold) {
@@ -136,8 +136,29 @@ function processPrice(data) {
 
     // 2. Check Fluctuations
     cleanHistory(now);
+    
+    // Check against history BEFORE adding current point (to avoid comparing with self if added first, though logic handles it)
+    // Actually, plan says: compare current vs past.
+    const fluctuation = checkFluctuation(currentPrice);
+    
+    // Add current to history AFTER check? 
+    // If we add first, the loop includes current vs current (0%), which is fine.
+    // Let's add first to maintain standard history, but be careful with the reset.
     priceHistory.push({ time: now, price: currentPrice });
-    checkFluctuation(currentPrice);
+
+    if (fluctuation.triggered) {
+        const title = `价格${fluctuation.type}预警`;
+        const body = `幅度: ${fluctuation.percentChange}% (前值: ${fluctuation.oldPrice} -> 现值: ${fluctuation.currentPrice})`;
+        
+        // Send Alert Immediately
+        sendBarkNotification(title, body);
+        io.emit('alert', { title, body, time: now });
+        
+        // Critical: Reset History
+        // "触发了 预警及发生之后 清楚这个时间 按照一定时间重新计算"
+        console.log(`[波动触发] ${body} - 历史数据已清空`);
+        priceHistory = []; 
+    }
 
     return {
         ...data,
@@ -145,10 +166,15 @@ function processPrice(data) {
     };
 }
 
+// Renamed/Simplified: Just a wrapper now, logic moved to processPrice or simplified checks
 function throttleAlert(title, body) {
     const now = Date.now();
-    // Prevent spamming: only alert once every minute for the same type effectively, 
-    // but here globally for simplicity. 
+    // Keep threshold alerts throttled? 
+    // User request focused on "Surge/Plunge" logic cleanup ("Optimization of surge/plunge function").
+    // "No cooldown" request specifically mentioned "Pre-warning trigger".
+    // I will keep threshold throttling to avoid spam on every poll for static levels, 
+    // but Fluctuation alerts are now handled directly in processPrice WITHOUT throttle.
+    
     if (now - lastAlertTime > 60000) { 
         sendBarkNotification(title, body);
         lastAlertTime = now;
@@ -162,18 +188,36 @@ function cleanHistory(now) {
 }
 
 function checkFluctuation(currentPrice) {
-    if (priceHistory.length < 2) return;
+    if (priceHistory.length < 1) return { triggered: false };
     
-    const oldest = priceHistory[0];
-    const priceDiff = currentPrice - oldest.price;
-    const percentChange = (priceDiff / oldest.price) * 100;
-
     const threshold = config.fluctuationThreshold || 0.5;
+    let maxDiffStats = null;
+    let maxPercent = 0;
 
-    if (Math.abs(percentChange) >= threshold) {
-        const type = percentChange > 0 ? '暴涨' : '暴跌';
-        throttleAlert(`价格${type}预警`, `过去 ${config.fluctuationWindow} 分钟内${type} ${percentChange.toFixed(2)}% (当前: ${currentPrice})`);
+    // Check current price against ALL history points
+    for (const point of priceHistory) {
+        const priceDiff = currentPrice - point.price;
+        const percentChange = (priceDiff / point.price) * 100;
+        
+        if (Math.abs(percentChange) >= threshold) {
+            // Find the maximum deviation
+            if (!maxDiffStats || Math.abs(percentChange) > Math.abs(maxPercent)) {
+                maxPercent = percentChange;
+                maxDiffStats = {
+                    type: percentChange > 0 ? '暴涨' : '暴跌',
+                    percentChange: percentChange.toFixed(2),
+                    oldPrice: point.price,
+                    currentPrice: currentPrice
+                };
+            }
+        }
     }
+
+    if (maxDiffStats) {
+        return { triggered: true, ...maxDiffStats };
+    }
+    
+    return { triggered: false };
 }
 
 // Scheduling
@@ -243,9 +287,6 @@ app.post('/api/test-bark', async (req, res) => {
         } catch (err) {
             res.status(500).json({ success: false, message: err.message });
         }
-    } else {
-        await sendBarkNotification('测试通知', '这是一条来自黄金监控的测试消息');
-        res.json({ success: true });
     }
 });
 
