@@ -92,7 +92,7 @@ function updatePriceUI(data) {
                 close: document.getElementById('intl-close-usd'),
             }
         });
-        document.getElementById('intl-time-usd').textContent = `更新: ${new Date(data.intl.usd.time).toLocaleTimeString()}`;
+        document.getElementById('intl-time-usd').textContent = `更新: ${data.intl.usd.time|| '--'}`;
     }
 
     // 2. International CNY
@@ -108,7 +108,7 @@ function updatePriceUI(data) {
                 close: document.getElementById('intl-close-cny'),
             }
         });
-        document.getElementById('intl-time-cny').textContent = `最后同步: ${new Date(data.intl.cny.time).toLocaleTimeString()}`;
+        document.getElementById('intl-time-cny').textContent = `更新: ${data.intl.cny.time}`;
     }
 
     // 3. CMB Gold
@@ -124,7 +124,7 @@ function updatePriceUI(data) {
                 low: document.getElementById('cmb-low'),
             }
         });
-        document.getElementById('cmb-time').textContent = `最后抓取: ${data.cmb.time || '--'}`;
+        document.getElementById('cmb-time').textContent = `更新: ${data.cmb.time || '--'}`;
     }
 
     // 4. CCB Gold
@@ -140,7 +140,7 @@ function updatePriceUI(data) {
                 low: document.getElementById('ccb-low'),
             }
         });
-        document.getElementById('ccb-time').textContent = `最后同步: ${new Date(data.ccb.timestamp).toLocaleTimeString()}`;
+        document.getElementById('ccb-time').textContent = `更新: ${data.ccb.time|| '--'}`;
     }
 }
 

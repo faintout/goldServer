@@ -31,6 +31,12 @@ module.exports = async () => {
         const usdData = parseQuote(resUsd.data);
         const cnyData = parseQuote(resCny.data);
 
+        const formatTime = (ts) => {
+            if (!ts) return '--:--:--';
+            const date = new Date(ts);
+            return date.toTimeString().split(' ')[0]; // 获取 HH:mm:ss
+        };
+
         if (usdData && cnyData) {
             return {
                 usd: {
@@ -41,7 +47,7 @@ module.exports = async () => {
                     close: usdData.q2,
                     change: usdData.q70,
                     changePercent: usdData.q80,
-                    time: usdData.time,
+                    time: formatTime(usdData.time),
                     timestamp: Date.now()
                 },
                 cny: {
@@ -52,7 +58,7 @@ module.exports = async () => {
                     close: cnyData.q2,
                     change: cnyData.q70,
                     changePercent: cnyData.q80,
-                    time: cnyData.time,
+                    time: formatTime(cnyData.time),
                     timestamp: Date.now()
                 }
             };

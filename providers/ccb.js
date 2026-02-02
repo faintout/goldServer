@@ -67,7 +67,7 @@ module.exports = async (agent, config, saveConfig) => {
                     close: null,
                     change: 0,
                     changePercent: 0,
-                    time: data.Tms ? data.Tms.split(' ')[1].split('.')[0] : '未知',
+                    time: data.Tms ? data.Tms.split(' ')[1].split('.')[0] : '--:--:--',
                     timestamp: Date.now(),
                     raw: data
                 };

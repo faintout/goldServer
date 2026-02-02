@@ -20,6 +20,7 @@ module.exports = async (config, saveConfig) => {
         const response = await axios.post(url, reqData, reqHeaders);
         if (response.data.success) {
             const marketData = response.data.data.FQAMBPRCZ1;
+            const time = response.data.data.NowTime
             if (marketData) {
                 const currentPrice = parseFloat(marketData.zBuyPrc);
                 
@@ -52,7 +53,7 @@ module.exports = async (config, saveConfig) => {
                     close: marketData.zPrvPrc,
                     change: marketData.zDvlCur,
                     changePercent: marketData.zPrcDif,
-                    time: marketData.NowTime ? marketData.NowTime.split(' ')[1] : '--',
+                    time: time ? time.split(' ')[1] : '--:--:--',
                     timestamp: Date.now(),
                     raw: marketData
                 };
