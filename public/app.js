@@ -18,6 +18,7 @@ const inpFlucThresh = document.getElementById('fluctuationThreshold');
 const inpFlucWindow = document.getElementById('fluctuationWindow');
 const inpBark = document.getElementById('barkUrl');
 const radiosMode = document.getElementsByName('fluctuationMode');
+const radiosChannel = document.getElementsByName('alertChannel');
 const elThresholdUnit = document.getElementById('threshold-unit');
 
 // Intl Elements
@@ -112,36 +113,34 @@ function updatePriceUI(data) {
 
     // 3. CMB Gold
     if (data.cmb) {
-        const cmb = data.cmb;
-        // CMB Mapping is slightly different in original processPrice
-        // data.cmb has zBuyPrc, zSelPrc, NowTime. 
-        // We need change and percent for CMB too. 
-        // Let's assume price is zBuyPrc for monitoring.
-        const cmbPrice = parseFloat(cmb.zBuyPrc);
-        const cmbPrev = parseFloat(cmb.zPrvPrc || cmbPrice); // Fallback to current if missing
-        const cmbChange = cmbPrice - cmbPrev;
-        const cmbPercent = (cmbChange / cmbPrev) * 100;
-
-        updateCard('card-cmb', {
-            price: cmbPrice,
-            change: cmbChange,
-            changePercent: cmbPercent,
-            buy: cmb.zBuyPrc,
-            sell: cmb.zSelPrc,
-            close: cmb.zPrvPrc,
-            status: cmb.zPrdStsDisp // zPrdStsDisp in CMB API? Need to check.
-        }, {
+        updateCard('card-cmb', data.cmb, {
             price: document.getElementById('cmb-price'),
             change: document.getElementById('cmb-change'),
             percent: document.getElementById('cmb-percent'),
             grid: {
                 buy: document.getElementById('cmb-buy'),
                 sell: document.getElementById('cmb-sell'),
-                close: document.getElementById('cmb-close'),
+                high: document.getElementById('cmb-high'),
+                low: document.getElementById('cmb-low'),
             }
         });
-        document.getElementById('cmb-stage').textContent = cmb.zPrdStsDisp || '--';
-        document.getElementById('cmb-time').textContent = `更新: ${cmb.NowTime || '--'}`;
+        document.getElementById('cmb-time').textContent = `最后抓取: ${data.cmb.time || '--'}`;
+    }
+
+    // 4. CCB Gold
+    if (data.ccb) {
+        updateCard('card-ccb', data.ccb, {
+            price: document.getElementById('ccb-price'),
+            change: document.getElementById('ccb-change'),
+            percent: document.getElementById('ccb-percent'),
+            grid: {
+                buy: document.getElementById('ccb-buy'),
+                sell: document.getElementById('ccb-sell'),
+                high: document.getElementById('ccb-high'),
+                low: document.getElementById('ccb-low'),
+            }
+        });
+        document.getElementById('ccb-time').textContent = `最后同步: ${new Date(data.ccb.timestamp).toLocaleTimeString()}`;
     }
 }
 
@@ -211,6 +210,12 @@ async function loadConfig() {
             if (r.value === mode) r.checked = true;
         });
         elThresholdUnit.textContent = mode === 'percent' ? '(%)' : '(元)';
+        
+        // Set Channel Radio
+        const channel = config.alertChannel || 'all';
+        radiosChannel.forEach(r => {
+            if (r.value === channel) r.checked = true;
+        });
 
     } catch (err) {
         addLog('加载配置失败', 'alert');
@@ -230,6 +235,7 @@ form.addEventListener('submit', async (e) => {
         fluctuationThreshold: parseFloat(inpFlucThresh.value),
         fluctuationWindow: parseFloat(inpFlucWindow.value),
         fluctuationMode: selectedMode,
+        alertChannel: Array.from(radiosChannel).find(r => r.checked)?.value || 'all',
         barkUrl: inpBark.value.trim()
     };
 

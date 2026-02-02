@@ -4,6 +4,12 @@ const { Server } = require('socket.io');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const crypto = require('crypto');
+
+const agent = new https.Agent({
+    secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -13,10 +19,16 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 
 // --- Global State ---
 let config = {};
-let priceHistory = []; // { time: ms, price: number }
-let lastAlertTime = 0;
+let priceHistory = {
+    cmb: [], // { time: ms, price: number }
+    ccb: []
+};
+let lastAlertTimes = {}; // { bankName: timestamp }
 let pollingIntervalId = null;
 let lastCombinedPrice = null;
+
+// CCB Session State
+let ccbCookies = '';
 
 // --- Helper Functions ---
 
@@ -26,6 +38,15 @@ function loadConfig() {
         if (fs.existsSync(CONFIG_PATH)) {
             const data = fs.readFileSync(CONFIG_PATH, 'utf8');
             config = JSON.parse(data);
+            
+            // 补全可能缺失的新字段
+            let updated = false;
+            if (config.alertChannel === undefined) {
+                config.alertChannel = 'all';
+                updated = true;
+            }
+            
+            if (updated) saveConfig();
             console.log('配置已加载:', config);
         } else {
             console.warn('配置文件不存在，使用默认值');
@@ -36,6 +57,7 @@ function loadConfig() {
                 fluctuationThreshold: 0.5,
                 fluctuationWindow: 5,
                 fluctuationMode: 'percent', // 'percent' or 'value'
+                alertChannel: 'all', // 'all' | 'cmb' | 'ccb' | 'intl'
                 barkUrl: ''
             };
             saveConfig();
@@ -80,123 +102,28 @@ function deObfuscate(str) {
     return Buffer.from(str, 'base64').toString('utf-8');
 }
 
-// Gold Price API
-const getGoldPrice = async () => {
-    const _0x1a2b = 'aHR0cHM6Ly9tYm1vZHVsZS1vcGVuYXBpLnBhYXMuY21iY2hpbmEuY29tL3Byb2R1Y3QvdjEvZnVuYy9tYXJrZXQtY2VudGVy';
-    const url = deObfuscate(_0x1a2b);
-    
-    const data = [{
-        prdType: "H",
-        prdCode: ""
-    }];
+// --- Providers ---
+const cmbProvider = require('./providers/cmb');
+const ccbProvider = require('./providers/ccb');
+const intlProvider = require('./providers/intl');
 
-    const _0x3f4e = 'aHR0cHM6Ly9tYm1vZHVsZS1vcGVuYXBpLnBhYXMuY21iY2hpbmEuY29tOjQ0My9wcm9kdWN0L3YxL2Z1bmMvbWFya2V0LWNlbnRlcg==';
-    
-    const reqConfig = {
-        headers: {
-            'Content-Type': 'application/json;charset=UTF-8',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/122.0.0.0',
-            'Referer': deObfuscate(_0x3f4e),
-            'Accept': 'application/json, text/plain, */*',
-        }
-    };
-
-    try {
-        const response = await axios.post(url, data, reqConfig);
-        if (response.data.success) {
-            const marketData = response.data.data;
-            if (marketData && marketData.FQAMBPRCZ1) {
-                return marketData.FQAMBPRCZ1;
-            }
-        } else {
-            console.error('业务处理失败:', response.data.msg);
-        }
-    } catch (error) {
-        console.error('网络请求异常:', error.message);
-    }
-    return null;
-};
-
-// --- International Gold Price (cngold.org) ---
-const getInternationalGoldPrice = async () => {
-    const codes = 'JO_92233';
-    const head = {
-        'Referer': 'https://m.cngold.org/',
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1'
-    };
-
-    try {
-        // Fetch USD/oz and CNY/g in parallel
-        const [resUsd, resCny] = await Promise.all([
-            axios.get(`https://api.jijinhao.com/quoteCenter/realTime.htm?codes=${codes}`, { headers: head }),
-            axios.get(`https://api.jijinhao.com/quoteCenter/realTime.htm?codes=${codes}&isCalc=true`, { headers: head })
-        ]);
-
-        const parseQuote = (jsString) => {
-            try {
-                const start = jsString.indexOf('{');
-                const end = jsString.lastIndexOf('}');
-                if (start !== -1 && end !== -1) {
-                    const jsonStr = jsString.substring(start, end + 1);
-                    const data = JSON.parse(jsonStr);
-                    return data[codes];
-                } else {
-                    console.error('未在响应中找到 JSON 对象:', jsString.substring(0, 100));
-                }
-            } catch (e) {
-                console.error('解析国际金价失败:', e.message, '内容预览:', jsString.substring(0, 100));
-            }
-            return null;
-        };
-
-        const usdData = parseQuote(resUsd.data);
-        const cnyData = parseQuote(resCny.data);
-
-        if (usdData && cnyData) {
-            return {
-                usd: {
-                    price: usdData.q63,
-                    high: usdData.q3,
-                    low: usdData.q4,
-                    open: usdData.q1,
-                    close: usdData.q2,
-                    change: usdData.q70,
-                    changePercent: usdData.q80,
-                    time: usdData.time
-                },
-                cny: {
-                    price: cnyData.q63,
-                    high: cnyData.q3,
-                    low: cnyData.q4,
-                    open: cnyData.q1,
-                    close: cnyData.q2,
-                    change: cnyData.q70,
-                    changePercent: cnyData.q80,
-                    time: cnyData.time
-                }
-            };
-        }
-    } catch (error) {
-        console.error('获取国际金价异常:', error.message);
-    }
-    return null;
-};
-
-function cleanHistory(now) {
+function cleanHistory(now, bank = 'cmb') {
     const windowMs = (config.fluctuationWindow || 5) * 60 * 1000;
-    priceHistory = priceHistory.filter(p => now - p.time <= windowMs);
+    if (!priceHistory[bank]) priceHistory[bank] = [];
+    priceHistory[bank] = priceHistory[bank].filter(p => now - p.time <= windowMs);
 }
 
-function checkFluctuation(currentPrice) {
-    if (priceHistory.length < 1) return { triggered: false };
+function checkFluctuation(currentPrice, bank = 'cmb') {
+    const history = priceHistory[bank] || [];
+    if (history.length < 1) return { triggered: false };
     
     const threshold = config.fluctuationThreshold || 0.5;
-    const mode = config.fluctuationMode || 'percent'; // 'percent' | 'value'
+    const mode = config.fluctuationMode || 'percent'; 
 
     let maxDiffStats = null;
-    let maxChange = 0; // percent or value
+    let maxChange = 0; 
 
-    for (const point of priceHistory) {
+    for (const point of history) {
         const priceDiff = currentPrice - point.price;
         let changeValue, changeMagnitude;
 
@@ -228,56 +155,75 @@ function checkFluctuation(currentPrice) {
     return { triggered: false };
 }
 
-// Monitor Logic
-function processPrice(data) {
-    const now = Date.now();
-    const currentPrice = parseFloat(data.zBuyPrc); // Use Buy Price for monitoring
+// Monitor Logic (Generic)
+function processPrice(bankData, bankId) {
+    if (!bankData) return null;
     
-    if (isNaN(currentPrice)) return;
+    const now = Date.now();
+    const currentPrice = parseFloat(bankData.price);
+    const bankLabel = bankId.toUpperCase();
+    
+    if (isNaN(currentPrice)) return bankData;
 
     // 1. Check Thresholds
-    if (currentPrice <= config.lowThreshold) {
-        throttleAlert('价格过低预警', `当前价格 ${currentPrice} 低于设定阈值 ${config.lowThreshold}`);
-    } else if (currentPrice >= config.highThreshold) {
-        throttleAlert('价格过高预警', `当前价格 ${currentPrice} 高于设定阈值 ${config.highThreshold}`);
+    const bankNamesMap = { 'cmb': '招商银行', 'ccb': '建设银行', 'intl': '国际金价' };
+    const bankCnName = bankNamesMap[bankId] || bankLabel;
+    const stats = config.priceStats?.[bankId] || {};
+    const effectivePrice = currentPrice; // Use main price for thresholds
+
+    if (effectivePrice <= config.lowThreshold) {
+        throttleAlert(`${bankLabel} ${bankCnName} 价格过低预警`, `当前价格 ${effectivePrice} 低于设定阈值 ${config.lowThreshold}`, bankId);
+    } else if (effectivePrice >= config.highThreshold) {
+        throttleAlert(`${bankLabel} ${bankCnName} 价格过高预警`, `当前价格 ${effectivePrice} 高于设定阈值 ${config.highThreshold}`, bankId);
     }
 
-    // 2. Check Fluctuations
-    cleanHistory(now);
+    // 2. Check Fluctuations (Based on primary price)
+    cleanHistory(now, bankId);
+    const fluctuation = checkFluctuation(currentPrice, bankId);
     
-    const fluctuation = checkFluctuation(currentPrice);
-    
-    priceHistory.push({ time: now, price: currentPrice });
+    if (!priceHistory[bankId]) priceHistory[bankId] = [];
+    priceHistory[bankId].push({ time: now, price: currentPrice });
 
     if (fluctuation.triggered) {
-        const title = `价格${fluctuation.type}预警`;
+        const bankNamesMap = { 'cmb': '招商银行', 'ccb': '建设银行', 'intl': '国际金价' };
+        const bankCnName = bankNamesMap[bankId] || bankLabel;
+        const title = `${bankLabel} ${bankCnName} 价格${fluctuation.type}预警`;
         const body = `幅度: ${fluctuation.changeDisplay} (前值: ${fluctuation.oldPrice} -> 现值: ${fluctuation.currentPrice})`;
         
-        // Send Alert Immediately
-        sendBarkNotification(title, body);
-        io.emit('alert', { title, body, time: now });
+        // Check filtering
+        const channel = config.alertChannel || 'all';
+        if (channel === 'all' || channel === bankId) {
+            sendBarkNotification(title, body);
+        }
         
-        console.log(`[波动触发] ${body} - 历史数据已清空`);
-        priceHistory = []; 
+        io.emit('alert', { title, body, time: now });
+        priceHistory[bankId] = []; 
     }
 
     return {
-        ...data,
+        ...bankData,
+        processedPrice: currentPrice,
         timestamp: now
     };
 }
 
 
 // Renamed/Simplified: Just a wrapper now, logic moved to processPrice or simplified checks
-function throttleAlert(title, body) {
+function throttleAlert(title, body, bankId) {
     const now = Date.now();
-    // Keep threshold alerts throttled? 
-    // I will keep threshold throttling to avoid spam on every poll for static levels, 
-    // but Fluctuation alerts are now handled directly in processPrice WITHOUT throttle.
+    const lastTime = lastAlertTimes[bankId] || 0;
     
-    if (now - lastAlertTime > 60000) { 
-        sendBarkNotification(title, body);
-        lastAlertTime = now;
+    // 使用配置中的波动窗口分钟作为预警冷却时间
+    const cooldownMs = (config.fluctuationWindow || 1) * 60 * 1000;
+    
+    if (now - lastTime > cooldownMs) { 
+        // Filter threshold alerts
+        const channel = config.alertChannel || 'all';
+        if (channel === 'all' || channel === bankId) {
+            sendBarkNotification(title, body);
+        }
+        
+        lastAlertTimes[bankId] = now;
         io.emit('alert', { title, body, time: now });
     }
 }
@@ -288,24 +234,29 @@ function startScheduler() {
     
     console.log(`启动调度任务，间隔: ${config.interval}ms`);
     pollingIntervalId = setInterval(async () => {
-        const [cmbData, intlData] = await Promise.all([
-            getGoldPrice(),
-            getInternationalGoldPrice()
-        ]);
+        try {
+            const [cmbRaw, intlRaw, ccbRaw] = await Promise.all([
+                cmbProvider(config, saveConfig),
+                intlProvider(),
+                ccbProvider(agent, config, saveConfig)
+            ]);
 
-        let combined = {};
-        if (cmbData) {
-            combined.cmb = processPrice(cmbData);
-            console.log(`[${new Date().toLocaleTimeString()}] 招行价格: ${cmbData.zBuyPrc}`);
-        }
-        if (intlData) {
-            combined.intl = intlData;
-            console.log(`[${new Date().toLocaleTimeString()}] 国际价格: ${intlData.usd.price} USD / ${intlData.cny.price} CNY`);
-        }
+            const combined = {};
+            if (cmbRaw) combined.cmb = processPrice(cmbRaw, 'cmb');
+            if (ccbRaw) combined.ccb = processPrice(ccbRaw, 'ccb');
+            if (intlRaw) {
+                combined.intl = {
+                    usd: intlRaw.usd,
+                    cny: processPrice(intlRaw.cny, 'intl')
+                };
+            }
 
-        if (Object.keys(combined).length > 0) {
-            lastCombinedPrice = combined;
-            io.emit('priceUpdate', combined);
+            if (Object.keys(combined).length > 0) {
+                lastCombinedPrice = combined;
+                io.emit('priceUpdate', combined);
+            }
+        } catch (e) {
+            console.error('Scheduler Error:', e.message);
         }
     }, config.interval);
 }
@@ -335,11 +286,7 @@ app.get('/api/price', async (req, res) => {
     if (lastCombinedPrice) {
         res.json({ success: true, data: lastCombinedPrice });
     } else {
-        // Fallback: try to fetch immediately if no cache
-        const [cmb, intl] = await Promise.all([getGoldPrice(), getInternationalGoldPrice()]);
-        const data = { cmb: cmb ? processPrice(cmb) : null, intl };
-        lastCombinedPrice = data;
-        res.json({ success: true, data });
+        res.json({ success: false, message: '数据正在初始化，请稍候' });
     }
 });
 
