@@ -8,78 +8,89 @@ module.exports = async (agent, config, saveConfig) => {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     };
 
-    let cookies = config.ccbCookies || '';
+    const fetchPriceData = async (retry = false) => {
+        let cookies = config.ccbCookies || '';
 
-    try {
-        // 1. Initialize Cookie if missing
-        if (!cookies) {
-            const res1 = await axios.get(cookieUrl, { headers, httpsAgent: agent });
-            const setCookie = res1.headers['set-cookie'];
-            if (setCookie) {
-                cookies = setCookie.map(c => c.split(';')[0]).join('; ');
-                config.ccbCookies = cookies;
-                saveConfig();
-            }
-        }
-
-        // 2. Fetch Price
-        const res2 = await axios.get(priceUrl, {
-            headers: {
-                ...headers,
-                'Cookie': cookies,
-                'Referer': 'https://gold2.ccb.com/chn/home/gold_new/gjssy/index.shtml',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            httpsAgent: agent
-        });
-
-        const data = res2.data;
-        if (data && data.Cst_Buy_Prc) {
-            const currentPrice = parseFloat(data.Cst_Buy_Prc);
-            
-            // 3. Update High/Low from config
-            if (!config.priceStats) config.priceStats = {};
-            if (!config.priceStats.ccb) config.priceStats.ccb = { high: 0, low: 9999, date: '' };
-            
-            const stats = config.priceStats.ccb;
-            const today = new Date().toLocaleDateString();
-            
-            if (stats.date !== today) {
-                stats.high = currentPrice;
-                stats.low = currentPrice;
-                stats.date = today;
-                saveConfig();
-            } else {
-                let changed = false;
-                if (currentPrice > stats.high) { stats.high = currentPrice; changed = true; }
-                if (currentPrice < stats.low) { stats.low = currentPrice; changed = true; }
-                if (changed) saveConfig();
+        try {
+            // 1. Initialize Cookie if missing
+            if (!cookies) {
+                const res1 = await axios.get(cookieUrl, { headers, httpsAgent: agent });
+                const setCookie = res1.headers['set-cookie'];
+                if (setCookie) {
+                    cookies = setCookie.map(c => c.split(';')[0]).join('; ');
+                    config.ccbCookies = cookies;
+                    saveConfig();
+                }
             }
 
-            return {
-                price: currentPrice,
-                buy: data.Cst_Buy_Prc,
-                sell: data.Cst_Sell_Prc,
-                high: stats.high,
-                low: stats.low,
-                open: null,
-                close: null,
-                change: 0,
-                changePercent: 0,
-                time: data.Tms ? data.Tms.split(' ')[1].split('.')[0] : '未知',
-                timestamp: Date.now(),
-                raw: data
-            };
-        } else if (typeof data === 'string' && data.includes('WCCMainPlatV5')) {
-            config.ccbCookies = '';
-            saveConfig();
+            // 2. Fetch Price
+            const res2 = await axios.get(priceUrl, {
+                headers: {
+                    ...headers,
+                    'Cookie': cookies,
+                    'Referer': 'https://gold2.ccb.com/chn/home/gold_new/gjssy/index.shtml',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                httpsAgent: agent
+            });
+
+            const data = res2.data;
+            if (data && data.Cst_Buy_Prc) {
+                const currentPrice = parseFloat(data.Cst_Buy_Prc);
+                
+                // 3. Update High/Low from config
+                if (!config.priceStats) config.priceStats = {};
+                if (!config.priceStats.ccb) config.priceStats.ccb = { high: 0, low: 9999, date: '' };
+                
+                const stats = config.priceStats.ccb;
+                const today = new Date().toLocaleDateString();
+                
+                if (stats.date !== today) {
+                    stats.high = currentPrice;
+                    stats.low = currentPrice;
+                    stats.date = today;
+                    saveConfig();
+                } else {
+                    let changed = false;
+                    if (currentPrice > stats.high) { stats.high = currentPrice; changed = true; }
+                    if (currentPrice < stats.low) { stats.low = currentPrice; changed = true; }
+                    if (changed) saveConfig();
+                }
+
+                return {
+                    price: currentPrice,
+                    buy: data.Cst_Buy_Prc,
+                    sell: data.Cst_Sell_Prc,
+                    high: stats.high,
+                    low: stats.low,
+                    open: null,
+                    close: null,
+                    change: 0,
+                    changePercent: 0,
+                    time: data.Tms ? data.Tms.split(' ')[1].split('.')[0] : '未知',
+                    timestamp: Date.now(),
+                    raw: data
+                };
+            } else if (typeof data === 'string' && (data.includes('WCCMainPlatV5') || data.includes('网上银行'))) {
+                // Session expired
+                config.ccbCookies = '';
+                saveConfig();
+                
+                if (!retry) {
+                    console.log('检测到建行 Cookie 失效，正在立即尝试重新初始化并重试...');
+                    return await fetchPriceData(true); // Retry once
+                }
+            }
+        } catch (error) {
+            console.error('建行请求失败:', error.message);
+            if (error.response && error.response.status === 403) {
+                config.ccbCookies = '';
+                saveConfig();
+                if (!retry) return await fetchPriceData(true);
+            }
         }
-    } catch (error) {
-        console.error('CCB Provider Error:', error.message);
-        if (error.response && error.response.status === 403) {
-            config.ccbCookies = '';
-            saveConfig();
-        }
-    }
-    return null;
+        return null;
+    };
+
+    return await fetchPriceData();
 };

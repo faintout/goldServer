@@ -71,7 +71,7 @@ function loadConfig() {
 function saveConfig() {
     try {
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-        console.log('配置已保存');
+        // console.log('配置已保存');
     } catch (err) {
         console.error('保存配置失败:', err);
     }
@@ -232,8 +232,9 @@ function throttleAlert(title, body, bankId) {
 function startScheduler() {
     if (pollingIntervalId) clearInterval(pollingIntervalId);
     
-    console.log(`启动调度任务，间隔: ${config.interval}ms`);
-    pollingIntervalId = setInterval(async () => {
+    console.log(`启动调度任务，间隔: ${config.interval}s`);
+
+    const task = async () => {
         try {
             const [cmbRaw, intlRaw, ccbRaw] = await Promise.all([
                 cmbProvider(config, saveConfig),
@@ -254,11 +255,24 @@ function startScheduler() {
             if (Object.keys(combined).length > 0) {
                 lastCombinedPrice = combined;
                 io.emit('priceUpdate', combined);
+                
+                // 恢复实时日志打印
+                const logTime = `[${new Date().toLocaleTimeString()}]`;
+                let logStr = logTime;
+                if (combined.cmb) logStr += ` 招行: ${combined.cmb.price}`;
+                if (combined.ccb) logStr += ` 建行: ${combined.ccb.price}`;
+                if (combined.intl) logStr += ` 国际: ${combined.intl.usd.price} USD / ${combined.intl.cny.price} CNY`;
+                console.log(logStr);
             }
         } catch (e) {
             console.error('Scheduler Error:', e.message);
         }
-    }, config.interval);
+    };
+
+    // 首次启动立即执行一次
+    task();
+    
+    pollingIntervalId = setInterval(task, config.interval * 1000);
 }
 
 // --- App Setup ---
@@ -275,7 +289,7 @@ app.post('/api/config', (req, res) => {
     const newConfig = req.body;
     // Basic validation
     config = { ...config, ...newConfig };
-    config.interval = Math.max(1000, config.interval); // Open min 1s
+    config.interval = Math.max(3, config.interval); // 最小 3 秒
     
     saveConfig();
     startScheduler(); // Restart with new interval
