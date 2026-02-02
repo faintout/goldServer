@@ -16,6 +16,7 @@ let config = {};
 let priceHistory = []; // { time: ms, price: number }
 let lastAlertTime = 0;
 let pollingIntervalId = null;
+let lastCombinedPrice = null;
 
 // --- Helper Functions ---
 
@@ -89,11 +90,13 @@ const getGoldPrice = async () => {
         prdCode: ""
     }];
 
+    const _0x3f4e = 'aHR0cHM6Ly9tYm1vZHVsZS1vcGVuYXBpLnBhYXMuY21iY2hpbmEuY29tOjQ0My9wcm9kdWN0L3YxL2Z1bmMvbWFya2V0LWNlbnRlcg==';
+    
     const reqConfig = {
         headers: {
             'Content-Type': 'application/json;charset=UTF-8',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/122.0.0.0',
-            'Referer': 'https://mbmodule-openapi.paas.cmbchina.com:443/product/v1/func/market-center',
+            'Referer': deObfuscate(_0x3f4e),
             'Accept': 'application/json, text/plain, */*',
         }
     };
@@ -110,6 +113,71 @@ const getGoldPrice = async () => {
         }
     } catch (error) {
         console.error('网络请求异常:', error.message);
+    }
+    return null;
+};
+
+// --- International Gold Price (cngold.org) ---
+const getInternationalGoldPrice = async () => {
+    const codes = 'JO_92233';
+    const head = {
+        'Referer': 'https://m.cngold.org/',
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1'
+    };
+
+    try {
+        // Fetch USD/oz and CNY/g in parallel
+        const [resUsd, resCny] = await Promise.all([
+            axios.get(`https://api.jijinhao.com/quoteCenter/realTime.htm?codes=${codes}`, { headers: head }),
+            axios.get(`https://api.jijinhao.com/quoteCenter/realTime.htm?codes=${codes}&isCalc=true`, { headers: head })
+        ]);
+
+        const parseQuote = (jsString) => {
+            try {
+                const start = jsString.indexOf('{');
+                const end = jsString.lastIndexOf('}');
+                if (start !== -1 && end !== -1) {
+                    const jsonStr = jsString.substring(start, end + 1);
+                    const data = JSON.parse(jsonStr);
+                    return data[codes];
+                } else {
+                    console.error('未在响应中找到 JSON 对象:', jsString.substring(0, 100));
+                }
+            } catch (e) {
+                console.error('解析国际金价失败:', e.message, '内容预览:', jsString.substring(0, 100));
+            }
+            return null;
+        };
+
+        const usdData = parseQuote(resUsd.data);
+        const cnyData = parseQuote(resCny.data);
+
+        if (usdData && cnyData) {
+            return {
+                usd: {
+                    price: usdData.q63,
+                    high: usdData.q3,
+                    low: usdData.q4,
+                    open: usdData.q1,
+                    close: usdData.q2,
+                    change: usdData.q70,
+                    changePercent: usdData.q80,
+                    time: usdData.time
+                },
+                cny: {
+                    price: cnyData.q63,
+                    high: cnyData.q3,
+                    low: cnyData.q4,
+                    open: cnyData.q1,
+                    close: cnyData.q2,
+                    change: cnyData.q70,
+                    changePercent: cnyData.q80,
+                    time: cnyData.time
+                }
+            };
+        }
+    } catch (error) {
+        console.error('获取国际金价异常:', error.message);
     }
     return null;
 };
@@ -220,11 +288,24 @@ function startScheduler() {
     
     console.log(`启动调度任务，间隔: ${config.interval}ms`);
     pollingIntervalId = setInterval(async () => {
-        const data = await getGoldPrice();
-        if (data) {
-            const processed = processPrice(data);
-            io.emit('priceUpdate', processed);
-            console.log(`[${new Date().toLocaleTimeString()}] 价格更新: 买入 ${data.zBuyPrc} / 卖出 ${data.zSelPrc}`);
+        const [cmbData, intlData] = await Promise.all([
+            getGoldPrice(),
+            getInternationalGoldPrice()
+        ]);
+
+        let combined = {};
+        if (cmbData) {
+            combined.cmb = processPrice(cmbData);
+            console.log(`[${new Date().toLocaleTimeString()}] 招行价格: ${cmbData.zBuyPrc}`);
+        }
+        if (intlData) {
+            combined.intl = intlData;
+            console.log(`[${new Date().toLocaleTimeString()}] 国际价格: ${intlData.usd.price} USD / ${intlData.cny.price} CNY`);
+        }
+
+        if (Object.keys(combined).length > 0) {
+            lastCombinedPrice = combined;
+            io.emit('priceUpdate', combined);
         }
     }, config.interval);
 }
@@ -251,12 +332,14 @@ app.post('/api/config', (req, res) => {
 });
 
 app.get('/api/price', async (req, res) => {
-    const data = await getGoldPrice();
-    if (data) {
-        // We don't trigger alerts here to avoid side-effects on manual refresh
-        res.json({ success: true, data });
+    if (lastCombinedPrice) {
+        res.json({ success: true, data: lastCombinedPrice });
     } else {
-        res.status(500).json({ success: false });
+        // Fallback: try to fetch immediately if no cache
+        const [cmb, intl] = await Promise.all([getGoldPrice(), getInternationalGoldPrice()]);
+        const data = { cmb: cmb ? processPrice(cmb) : null, intl };
+        lastCombinedPrice = data;
+        res.json({ success: true, data });
     }
 });
 

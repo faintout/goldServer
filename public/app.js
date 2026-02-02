@@ -1,5 +1,7 @@
 const socket = io();
 
+const btnTestBark = document.getElementById('test-bark');
+
 // Elements
 const elBuyPrice = document.getElementById('buy-price');
 const elSellPrice = document.getElementById('sell-price');
@@ -17,7 +19,20 @@ const inpFlucWindow = document.getElementById('fluctuationWindow');
 const inpBark = document.getElementById('barkUrl');
 const radiosMode = document.getElementsByName('fluctuationMode');
 const elThresholdUnit = document.getElementById('threshold-unit');
-const btnTestBark = document.getElementById('test-bark');
+
+// Intl Elements
+const elIntlCard = document.getElementById('intl-price-card');
+const elIntlUsd = document.getElementById('intl-price-usd');
+const elIntlCnyPrice = document.getElementById('intl-price-cny');
+const elIntlChangeVal = document.getElementById('intl-change-val');
+const elIntlChangePercent = document.getElementById('intl-change-percent');
+const elIntlHighUsd = document.getElementById('intl-high-usd');
+const elIntlHighCny = document.getElementById('intl-high-cny');
+const elIntlLowUsd = document.getElementById('intl-low-usd');
+const elIntlLowCny = document.getElementById('intl-low-cny');
+const elIntlTime = document.getElementById('intl-time');
+const elIntlStatus = document.getElementById('intl-status');
+
 
 // State
 let currentConfig = {};
@@ -31,17 +46,103 @@ function addLog(msg, type = 'info') {
     if (elLog.children.length > 50) elLog.lastChild.remove();
 }
 
+// Helper: Update Individual Gold Card
+function updateCard(cardId, data, elements) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+
+    // 1. Set Prices and Changes (Fixed to 2 decimals)
+    if (elements.price) elements.price.textContent = parseFloat(data.price).toFixed(2);
+    if (elements.change) elements.change.textContent = (data.change >= 0 ? '+' : '') + parseFloat(data.change).toFixed(2);
+    if (elements.percent) elements.percent.textContent = (data.changePercent >= 0 ? '+' : '') + parseFloat(data.changePercent).toFixed(2) + '%';
+
+    // 2. Set Grid Info
+    if (elements.grid) {
+        for (const [key, el] of Object.entries(elements.grid)) {
+            if (el && data[key] !== undefined) {
+                el.textContent = parseFloat(data[key]).toFixed(2);
+            }
+        }
+    }
+
+    // 3. Set Color State
+    card.classList.remove('up', 'down');
+    const change = parseFloat(data.change);
+    if (change > 0) card.classList.add('up');
+    else if (change < 0) card.classList.add('down');
+
+    // 4. Flash Effect
+    card.classList.add('flash');
+    setTimeout(() => card.classList.remove('flash'), 400);
+}
+
 // Helper: Update UI
 function updatePriceUI(data) {
-    elBuyPrice.textContent = data.zBuyPrc;
-    elSellPrice.textContent = data.zSelPrc;
-    elTime.textContent = data.NowTime || new Date().toLocaleTimeString();
-    
-    // Simple visual flash
-    document.querySelector('.price-card').style.borderColor = 'var(--accent-color)';
-    setTimeout(() => {
-        document.querySelector('.price-card').style.borderColor = 'var(--border-color)';
-    }, 300);
+    // 1. International USD
+    if (data.intl && data.intl.usd) {
+        updateCard('card-intl-usd', data.intl.usd, {
+            price: document.getElementById('intl-price-usd'),
+            change: document.getElementById('intl-change-usd'),
+            percent: document.getElementById('intl-percent-usd'),
+            grid: {
+                high: document.getElementById('intl-high-usd'),
+                low: document.getElementById('intl-low-usd'),
+                open: document.getElementById('intl-open-usd'),
+                close: document.getElementById('intl-close-usd'),
+            }
+        });
+        document.getElementById('intl-time-usd').textContent = `更新: ${new Date(data.intl.usd.time).toLocaleTimeString()}`;
+    }
+
+    // 2. International CNY
+    if (data.intl && data.intl.cny) {
+        updateCard('card-intl-cny', data.intl.cny, {
+            price: document.getElementById('intl-price-cny'),
+            change: document.getElementById('intl-change-cny'),
+            percent: document.getElementById('intl-percent-cny'),
+            grid: {
+                high: document.getElementById('intl-high-cny'),
+                low: document.getElementById('intl-low-cny'),
+                open: document.getElementById('intl-open-cny'),
+                close: document.getElementById('intl-close-cny'),
+            }
+        });
+        document.getElementById('intl-time-cny').textContent = `最后同步: ${new Date(data.intl.cny.time).toLocaleTimeString()}`;
+    }
+
+    // 3. CMB Gold
+    if (data.cmb) {
+        const cmb = data.cmb;
+        // CMB Mapping is slightly different in original processPrice
+        // data.cmb has zBuyPrc, zSelPrc, NowTime. 
+        // We need change and percent for CMB too. 
+        // Let's assume price is zBuyPrc for monitoring.
+        const cmbPrice = parseFloat(cmb.zBuyPrc);
+        const cmbPrev = parseFloat(cmb.zPrvPrc || cmbPrice); // Fallback to current if missing
+        const cmbChange = cmbPrice - cmbPrev;
+        const cmbPercent = (cmbChange / cmbPrev) * 100;
+
+        updateCard('card-cmb', {
+            price: cmbPrice,
+            change: cmbChange,
+            changePercent: cmbPercent,
+            buy: cmb.zBuyPrc,
+            sell: cmb.zSelPrc,
+            close: cmb.zPrvPrc,
+            status: cmb.zPrdStsDisp // zPrdStsDisp in CMB API? Need to check.
+        }, {
+            price: document.getElementById('cmb-price'),
+            change: document.getElementById('cmb-change'),
+            percent: document.getElementById('cmb-percent'),
+            grid: {
+                buy: document.getElementById('cmb-buy'),
+                sell: document.getElementById('cmb-sell'),
+                close: document.getElementById('cmb-close'),
+            }
+        });
+        document.getElementById('cmb-stage').textContent = cmb.zPrdStsDisp || '--';
+        document.getElementById('cmb-time').textContent = `更新: ${cmb.NowTime || '--'}`;
+    }
 }
 
 // Initial Load

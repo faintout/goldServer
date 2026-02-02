@@ -16,21 +16,103 @@
         </header>
 
         <main>
-            <section class="price-card">
-                <div class="price-header">当前报价 (CNY/g)</div>
-                <div class="price-display">
-                    <div class="price-item">
-                        <span class="label">买入价</span>
-                        <span class="value" id="buy-price">--.--</span>
+            <!-- International Gold Section -->
+            <div class="section-group">
+                <h2 class="section-title">国际现货报价</h2>
+                
+                <!-- USD Card -->
+                <div id="card-intl-usd" class="gold-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <span class="name">现货黄金 (USD)</span>
+                            <span class="badge">国际</span>
+                        </div>
+                        <div class="action-group">
+                            <span class="icon">刷新</span>
+                        </div>
                     </div>
-                    <div class="divider"></div>
-                    <div class="price-item">
-                        <span class="label">卖出价</span>
-                        <span class="value" id="sell-price">--.--</span>
+                    <div class="card-body">
+                        <div class="main-price" id="intl-price-usd">--.--</div>
+                        <div class="unit-group">
+                            <div class="unit">美元/盎司</div>
+                        </div>
+                    </div>
+                    <div class="card-change">
+                        <span id="intl-change-usd">--.--</span>
+                        <span id="intl-percent-usd">--.--%</span>
+                    </div>
+                    <div class="card-footer">
+                        <div class="info-grid">
+                            <span>开盘:<em id="intl-open-usd">--.--</em></span>
+                            <span>昨收:<em id="intl-close-usd">--.--</em></span>
+                            <span>最高:<em id="intl-high-usd">--.--</em></span>
+                            <span>最低:<em id="intl-low-usd">--.--</em></span>
+                        </div>
+                        <div class="card-time" id="intl-time-usd">交易中: --:--:--</div>
                     </div>
                 </div>
-                <div class="timestamp">更新时间: <span id="update-time">--:--:--</span></div>
-            </section>
+
+                <!-- CNY Card -->
+                <div id="card-intl-cny" class="gold-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <span class="name">现货黄金 (CNY)</span>
+                            <span class="badge">换算</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="main-price" id="intl-price-cny">--.--</div>
+                        <div class="unit-group">
+                            <div class="unit">元/克</div>
+                        </div>
+                    </div>
+                    <div class="card-change">
+                        <span id="intl-change-cny">--.--</span>
+                        <span id="intl-percent-cny">--.--%</span>
+                    </div>
+                    <div class="card-footer">
+                        <div class="info-grid">
+                            <span>开盘:<em id="intl-open-cny">--.--</em></span>
+                            <span>昨收:<em id="intl-close-cny">--.--</em></span>
+                            <span>最高:<em id="intl-high-cny">--.--</em></span>
+                            <span>最低:<em id="intl-low-cny">--.--</em></span>
+                        </div>
+                        <div class="card-time" id="intl-time-cny">数据同步中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CMB Gold Section -->
+            <div class="section-group">
+                <h2 class="section-title">招行金价动态</h2>
+                <div id="card-cmb" class="gold-card">
+                    <div class="card-header">
+                        <div class="title-group">
+                            <span class="name">招行金 (CNY)</span>
+                            <span class="badge">官方</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="main-price" id="cmb-price">--.--</div>
+                        <div class="unit-group">
+                            <div class="unit">元/克</div>
+                        </div>
+                    </div>
+                    <div class="card-change">
+                        <span id="cmb-change">--.--</span>
+                        <span id="cmb-percent">--.--%</span>
+                    </div>
+                    <div class="card-footer">
+                        <div class="info-grid">
+                            <span>买入:<em id="cmb-buy">--.--</em></span>
+                            <span>卖出:<em id="cmb-sell">--.--</em></span>
+                            <span>昨收:<em id="cmb-close">--.--</em></span>
+                            <span>状态:<em id="cmb-stage">--</em></span>
+                        </div>
+                        <div class="card-time" id="cmb-time">更新时间: --:--:--</div>
+                    </div>
+                </div>
+            </div>
 
             <section class="config-section">
                 <h2>监控配置</h2>

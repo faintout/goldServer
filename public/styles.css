@@ -225,6 +225,140 @@ input:focus {
     border-bottom: none;
 }
 
-.log-item.alert {
-    color: var(--danger-color);
+/* Section Groups */
+.section-group {
+    margin-bottom: 32px;
+}
+
+.section-title {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    padding-left: 4px;
+    border-left: 3px solid var(--accent-color);
+}
+
+/* Gold Card System (Professional Look) */
+.gold-card {
+    background: #475569; /* Default Grey */
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 20px;
+    color: #ffffff;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+}
+
+.gold-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Red for UP, Green for DOWN (Chinese Market Standard) */
+.gold-card.up {
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%); /* Vivid Red */
+}
+
+.gold-card.down {
+    background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); /* Vivid Green */
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.card-header .name {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.card-header .badge {
+    background: rgba(255, 255, 255, 0.2);
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    font-weight: normal;
+}
+
+.card-header .action-group .icon {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+.card-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-top: -4px;
+}
+
+.main-price {
+    font-size: 3.5rem;
+    font-weight: 700;
+    line-height: 1;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: -1px;
+}
+
+.unit-group {
+    text-align: right;
+}
+
+.unit-group .unit {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.card-change {
+    margin-top: 4px;
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    gap: 16px;
+}
+
+.card-footer {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.info-grid span {
+    opacity: 0.9;
+}
+
+.info-grid em {
+    font-style: normal;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+.card-time {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    text-align: right;
+}
+
+/* Animations */
+@keyframes pulse-white {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.gold-card.flash .main-price {
+    animation: pulse-white 0.4s ease;
 }
