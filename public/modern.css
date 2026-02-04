@@ -1,0 +1,421 @@
+:root {
+    --primary-bg: #0b0e14;
+    --card-bg: rgba(23, 28, 41, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent-gold: #fbbf24;
+    --up-color: #f43f5e;
+    --down-color: #10b981;
+    --glow-color: rgba(251, 191, 36, 0.2);
+    --input-bg: rgba(15, 23, 42, 0.6);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+    background-color: var(--primary-bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding-bottom: 5rem;
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* 炫彩流动背景 */
+.bg-gradient {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    background: radial-gradient(circle at 10% 20%, #1e1b4b 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, #312e81 0%, transparent 40%);
+}
+
+.blob {
+    position: fixed;
+    width: 50vw;
+    height: 50vw;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(147, 51, 234, 0.15));
+    filter: blur(100px);
+    border-radius: 50%;
+    z-index: -1;
+    animation: move 30s infinite alternate;
+}
+
+.blob-2 {
+    width: 40vw;
+    height: 40vw;
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(249, 115, 22, 0.1));
+    right: -10vw;
+    top: -10vw;
+    animation-duration: 40s;
+    animation-delay: -10s;
+}
+
+@keyframes move {
+    from { transform: translate(-10%, -10%) rotate(0deg); }
+    to { transform: translate(30%, 20%) rotate(360deg); }
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3.5rem;
+}
+
+.title-area h1 {
+    font-size: 2.5rem;
+    font-weight: 900;
+    background: linear-gradient(to right, #fbbf24, #f59e0b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -1px;
+}
+
+.title-area p {
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+.status-indicator {
+    padding: 0.5rem 1rem;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid var(--glass-border);
+    border-radius: 99px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #64748b;
+}
+
+.status-indicator.connected .status-dot {
+    background: var(--down-color);
+    box-shadow: 0 0 10px var(--down-color);
+}
+
+/* 数据卡片 */
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 2.5rem 0 1.5rem;
+    padding-left: 1rem;
+    border-left: 4px solid var(--accent-gold);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+}
+
+.card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 28px;
+    padding: 1.75rem;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+.card:hover {
+    transform: translateY(-8px);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+}
+
+.bank-info .name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    display: block;
+}
+
+.bank-info .badge {
+    font-size: 0.7rem;
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--accent-gold);
+    padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    margin-top: 0.25rem;
+    display: inline-block;
+}
+
+.update-time {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.main-stat {
+    margin: 0.5rem 0 1.5rem;
+}
+
+.price-value {
+    font-size: 3.5rem;
+    font-weight: 900;
+    letter-spacing: -2px;
+    line-height: 1;
+}
+
+.price-unit {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-left: 0.5rem;
+}
+
+.change-row {
+    display: flex;
+    gap: 1rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-top: 0.5rem;
+}
+
+/* 详细数据网格 */
+.data-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--glass-border);
+    margin-top: auto;
+}
+
+.data-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.item-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.25rem;
+}
+
+.item-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+/* 配置面板 */
+.config-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    margin-top: 4rem;
+}
+
+.glass-panel {
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(30px);
+    border: 1px solid var(--glass-border);
+    border-radius: 28px;
+    padding: 2.5rem;
+}
+
+.panel-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group.full {
+    grid-column: span 2;
+}
+
+label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+input[type="text"],
+input[type="number"] {
+    background: var(--input-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    color: white;
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.3s;
+}
+
+input:focus {
+    border-color: var(--accent-gold);
+    background: rgba(15, 23, 42, 0.8);
+}
+
+.radio-group {
+    display: flex;
+    gap: 1rem;
+    background: var(--input-bg);
+    padding: 0.4rem;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+}
+
+.radio-item {
+    flex: 1;
+    cursor: pointer;
+}
+
+.radio-item input {
+    display: none;
+}
+
+.radio-item span {
+    display: block;
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    transition: 0.2s;
+}
+
+.radio-item input:checked + span {
+    background: var(--accent-gold);
+    color: #000;
+    font-weight: 700;
+}
+
+.btn-group {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+button {
+    flex: 1;
+    padding: 0.85rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    border: none;
+}
+
+.btn-primary {
+    background: var(--accent-gold);
+    color: #000;
+}
+
+.btn-primary:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+    border: 1px solid var(--glass-border);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* 日志面板 */
+.log-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#log-container {
+    flex: 1;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-right: 0.5rem;
+    max-height: 500px;
+}
+
+.log-item {
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid #4b5563;
+}
+
+.log-item.alert {
+    border-left-color: var(--up-color);
+    background: rgba(244, 63, 94, 0.05);
+}
+
+.change-up { color: var(--up-color); }
+.change-down { color: var(--down-color); }
+
+/* 闪烁特效 */
+@keyframes flash {
+    0% { background: rgba(255, 255, 255, 0); }
+    50% { background: rgba(255, 255, 255, 0.1); }
+    100% { background: rgba(255, 255, 255, 0); }
+}
+
+.flash {
+    animation: flash 0.4s ease-out;
+}
+
+@media (max-width: 1024px) {
+    .config-layout { grid-template-columns: 1fr; }
+    .grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .form-group.full { grid-column: auto; }
+    .price-value { font-size: 2.8rem; }
+}

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>黄金价格监控 | Modern Glow</title>
+    <link rel="stylesheet" href="modern.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    <div class="blob"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="container">
+        <header>
+            <div class="title-area">
+                <h1>GOLD MONITOR</h1>
+                <p>实时黄金价格监控系统 · 现代版</p>
+            </div>
+            <div class="status-indicator" id="status-indicator">
+                <span class="status-dot"></span>
+                <span id="status-text">连接中...</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- 国际报价区域 -->
+            <h2 class="section-title">国际现货报价</h2>
+            <div class="grid">
+                <!-- USD Card -->
+                <div id="card-intl-usd" class="card">
+                    <div class="card-header">
+                        <div class="bank-info">
+                            <span class="name">现货黄金 (USD)</span>
+                            <span class="badge">国际</span>
+                        </div>
+                        <span class="update-time" id="intl-time-usd">更新: --:--</span>
+                    </div>
+                    <div class="main-stat">
+                        <div class="price-row">
+                            <span class="price-value" id="intl-price-usd">--.--</span>
+                            <span class="price-unit">USD/oz</span>
+                        </div>
+                        <div class="change-row">
+                            <span id="intl-change-usd">--.--</span>
+                            <span id="intl-percent-usd">--.--%</span>
+                        </div>
+                    </div>
+                    <div class="data-grid">
+                        <div class="data-item"><span class="item-label">昨收</span><span class="item-value" id="intl-close-usd">--.--</span></div>
+                        <div class="data-item"><span class="item-label">开盘</span><span class="item-value" id="intl-open-usd">--.--</span></div>
+                        <div class="data-item"><span class="item-label">最高</span><span class="item-value" id="intl-high-usd">--.--</span></div>
+                        <div class="data-item"><span class="item-label">最低</span><span class="item-value" id="intl-low-usd">--.--</span></div>
+                    </div>
+                </div>
+
+                <!-- CNY Card -->
+                <div id="card-intl-cny" class="card">
+                    <div class="card-header">
+                        <div class="bank-info">
+                            <span class="name">现货黄金 (CNY)</span>
+                            <span class="badge">换算</span>
+                        </div>
+                        <span class="update-time" id="intl-time-cny">更新: --:--</span>
+                    </div>
+                    <div class="main-stat">
+                        <div class="price-row">
+                            <span class="price-value" id="intl-price-cny">--.--</span>
+                            <span class="price-unit">元/克</span>
+                        </div>
+                        <div class="change-row">
+                            <span id="intl-change-cny">--.--</span>
+                            <span id="intl-percent-cny">--.--%</span>
+                        </div>
+                    </div>
+                    <div class="data-grid">
+                        <div class="data-item"><span class="item-label">昨收</span><span class="item-value" id="intl-close-cny">--.--</span></div>
+                        <div class="data-item"><span class="item-label">开盘</span><span class="item-value" id="intl-open-cny">--.--</span></div>
+                        <div class="data-item"><span class="item-label">最高</span><span class="item-value" id="intl-high-cny">--.--</span></div>
+                        <div class="data-item"><span class="item-label">最低</span><span class="item-value" id="intl-low-cny">--.--</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 国内报价区域 -->
+            <h2 class="section-title">国内银行实盘</h2>
+            <div class="grid">
+                <!-- CMB Card -->
+                <div id="card-cmb" class="card">
+                    <div class="card-header">
+                        <div class="bank-info">
+                            <span class="name">招行金 (CNY)</span>
+                            <span class="badge">官方</span>
+                        </div>
+                        <span class="update-time" id="cmb-time">更新: --:--</span>
+                    </div>
+                    <div class="main-stat">
+                        <div class="price-row">
+                            <span class="price-value" id="cmb-price">--.--</span>
+                            <span class="price-unit">元/克</span>
+                        </div>
+                        <div class="change-row">
+                            <span id="cmb-change">--.--</span>
+                            <span id="cmb-percent">--.--%</span>
+                        </div>
+                    </div>
+                    <div class="data-grid">
+                        <div class="data-item"><span class="item-label">买入价</span><span class="item-value" id="cmb-buy">--.--</span></div>
+                        <div class="data-item"><span class="item-label">卖出价</span><span class="item-value" id="cmb-sell">--.--</span></div>
+                        <div class="data-item"><span class="item-label">最高</span><span class="item-value" id="cmb-high">--.--</span></div>
+                        <div class="data-item"><span class="item-label">最低</span><span class="item-value" id="cmb-low">--.--</span></div>
+                        <div class="data-item" style="grid-column: span 2;"><span class="item-label">昨收</span><span class="item-value" id="cmb-close">--.--</span></div>
+                    </div>
+                </div>
+
+                <!-- CCB Card -->
+                <div id="card-ccb" class="card">
+                    <div class="card-header">
+                        <div class="bank-info">
+                            <span class="name">建行实物金 (CNY)</span>
+                            <span class="badge">官方</span>
+                        </div>
+                        <span class="update-time" id="ccb-time">更新: --:--</span>
+                    </div>
+                    <div class="main-stat">
+                        <div class="price-row">
+                            <span class="price-value" id="ccb-price">--.--</span>
+                            <span class="price-unit">元/克</span>
+                        </div>
+                        <div class="change-row">
+                            <span id="ccb-change">--.--</span>
+                            <span id="ccb-percent">--.--%</span>
+                        </div>
+                    </div>
+                    <div class="data-grid">
+                        <div class="data-item"><span class="item-label">买入价</span><span class="item-value" id="ccb-buy">--.--</span></div>
+                        <div class="data-item"><span class="item-label">卖出价</span><span class="item-value" id="ccb-sell">--.--</span></div>
+                        <div class="data-item"><span class="item-label">最高</span><span class="item-value" id="ccb-high">--.--</span></div>
+                        <div class="data-item"><span class="item-label">最低</span><span class="item-value" id="ccb-low">--.--</span></div>
+                        <div class="data-item" style="grid-column: span 2;"><span class="item-label">昨收</span><span class="item-value" id="ccb-close">--.--</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 设置与日志区域 -->
+            <div class="config-layout">
+                <section class="glass-panel">
+                    <h2 class="panel-title">监控配置中心</h2>
+                    <form id="config-form" class="form-grid">
+                        <div class="form-group">
+                            <label>查询间隔 (秒)</label>
+                            <input type="number" id="interval" min="3">
+                        </div>
+                        <div class="form-group">
+                            <label>波动推送渠道</label>
+                            <div class="radio-group" id="channel-group">
+                                <label class="radio-item"><input type="radio" name="alertChannel" value="all" checked><span>全部</span></label>
+                                <label class="radio-item"><input type="radio" name="alertChannel" value="cmb"><span>招行</span></label>
+                                <label class="radio-item"><input type="radio" name="alertChannel" value="ccb"><span>建行</span></label>
+                                <label class="radio-item"><input type="radio" name="alertChannel" value="intl"><span>国际</span></label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>低价预警 (≤)</label>
+                            <input type="number" id="lowThreshold" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>高价预警 (≥)</label>
+                            <input type="number" id="highThreshold" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>波动检测模式</label>
+                            <div class="radio-group" id="mode-group">
+                                <label class="radio-item"><input type="radio" name="fluctuationMode" value="percent" checked><span>百分比 (%)</span></label>
+                                <label class="radio-item"><input type="radio" name="fluctuationMode" value="value"><span>数值 (元)</span></label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>波动阈值 <span id="threshold-unit">(%)</span></label>
+                            <input type="number" id="fluctuationThreshold" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label>波动检测窗口 (分钟)</label>
+                            <input type="number" id="fluctuationWindow" step="1">
+                        </div>
+                        <div class="form-group full">
+                            <label>Bark 推送链接</label>
+                            <input type="text" id="barkUrl" placeholder="https://api.day.app/YOUR_KEY/">
+                        </div>
+                        <div class="form-group full btn-group">
+                            <button type="submit" class="btn-primary">保存并应用配置</button>
+                            <button type="button" id="test-bark" class="btn-secondary">测试 Bark 通道</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="glass-panel log-panel">
+                    <h2 class="panel-title">实时运行日志</h2>
+                    <div id="log-container">
+                        <!-- Logs inject here -->
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const socket = io();
+        const elContainer = document.querySelector('.container');
+        const elStatus = document.getElementById('status-indicator');
+        const elStatusText = document.getElementById('status-text');
+        const elLog = document.getElementById('log-container');
+        const elUnit = document.getElementById('threshold-unit');
+        const configForm = document.getElementById('config-form');
+
+        // Helper: Add Log
+        function addLog(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-item ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            elLog.prepend(div);
+            if (elLog.children.length > 50) elLog.lastChild.remove();
+        }
+
+        // Helper: Format & Update Value
+        function updateVal(id, val, prefix = '', isPrice = false) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const num = parseFloat(val);
+            if (isNaN(num)) {
+                el.textContent = '--.--';
+                return;
+            }
+            const formatted = prefix + num.toFixed(2);
+            if (el.textContent !== formatted) {
+                el.textContent = formatted;
+                if (isPrice) {
+                    const card = el.closest('.card');
+                    card.classList.add('flash');
+                    setTimeout(() => card.classList.remove('flash'), 500);
+                }
+            }
+        }
+
+        function updateChangeStyle(id, value, isPercent = false) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const val = parseFloat(value);
+            if (isNaN(val)) return;
+            el.textContent = (val >= 0 ? '+' : '') + val.toFixed(2) + (isPercent ? '%' : '');
+            el.className = val >= 0 ? 'change-up' : 'change-down';
+        }
+
+        // Card Updater
+        function syncCard(cardId, data, elements) {
+            const card = document.getElementById(cardId);
+            if (!card) return;
+
+            updateVal(elements.priceId, data.price, '', true);
+            updateChangeStyle(elements.changeId, data.change);
+            updateChangeStyle(elements.percentId, data.changePercent, true);
+
+            if (elements.grid) {
+                for (const [key, id] of Object.entries(elements.grid)) {
+                    updateVal(id, data[key]);
+                }
+            }
+            if (elements.timeId) {
+                document.getElementById(elements.timeId).textContent = `更新: ${data.time || '--:--'}`;
+            }
+        }
+
+        // Helper to trigger all updates
+        function updateAll(data) {
+            if (!data) return;
+            if (data.intl && data.intl.usd) {
+                syncCard('card-intl-usd', data.intl.usd, {
+                    priceId: 'intl-price-usd',
+                    changeId: 'intl-change-usd',
+                    percentId: 'intl-percent-usd',
+                    timeId: 'intl-time-usd',
+                    grid: { high: 'intl-high-usd', low: 'intl-low-usd', open: 'intl-open-usd', close: 'intl-close-usd' }
+                });
+            }
+            if (data.intl && data.intl.cny) {
+                syncCard('card-intl-cny', data.intl.cny, {
+                    priceId: 'intl-price-cny',
+                    changeId: 'intl-change-cny',
+                    percentId: 'intl-percent-cny',
+                    timeId: 'intl-time-cny',
+                    grid: { high: 'intl-high-cny', low: 'intl-low-cny', open: 'intl-open-cny', close: 'intl-close-cny' }
+                });
+            }
+            if (data.cmb) {
+                syncCard('card-cmb', data.cmb, {
+                    priceId: 'cmb-price',
+                    changeId: 'cmb-change',
+                    percentId: 'cmb-percent',
+                    timeId: 'cmb-time',
+                    grid: { buy: 'cmb-buy', sell: 'cmb-sell', high: 'cmb-high', low: 'cmb-low', close: 'cmb-close' }
+                });
+            }
+            if (data.ccb) {
+                syncCard('card-ccb', data.ccb, {
+                    priceId: 'ccb-price',
+                    changeId: 'ccb-change',
+                    percentId: 'ccb-percent',
+                    timeId: 'ccb-time',
+                    grid: { buy: 'ccb-buy', sell: 'ccb-sell', high: 'ccb-high', low: 'ccb-low', close: 'ccb-close' }
+                });
+            }
+        }
+
+        // Data Synchronization
+        socket.on('priceUpdate', (data) => {
+            updateAll(data);
+        });
+
+        socket.on('alert', (alert) => {
+            addLog(`${alert.title}: ${alert.body}`, 'alert');
+        });
+
+        socket.on('connect', () => {
+            elStatus.classList.add('connected');
+            elStatusText.textContent = '已连接服务';
+            addLog('服务器连接成功');
+            loadConfig();
+        });
+
+        socket.on('disconnect', () => {
+            elStatus.classList.remove('connected');
+            elStatusText.textContent = '连接断开';
+            addLog('服务器连接已断开', 'alert');
+        });
+
+        // Config Management
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const config = await res.json();
+                
+                document.getElementById('interval').value = config.interval;
+                document.getElementById('lowThreshold').value = config.lowThreshold;
+                document.getElementById('highThreshold').value = config.highThreshold;
+                document.getElementById('fluctuationThreshold').value = config.fluctuationThreshold;
+                document.getElementById('fluctuationWindow').value = config.fluctuationWindow;
+                document.getElementById('barkUrl').value = config.barkUrl || '';
+
+                const mode = config.fluctuationMode || 'percent';
+                document.querySelectorAll('[name="fluctuationMode"]').forEach(r => r.checked = r.value === mode);
+                elUnit.textContent = mode === 'percent' ? '(%)' : '(元)';
+
+                const channel = config.alertChannel || 'all';
+                document.querySelectorAll('[name="alertChannel"]').forEach(r => r.checked = r.value === channel);
+                
+                addLog('远程配置加载完成');
+            } catch (err) {
+                addLog('加载远程配置失败', 'alert');
+            }
+        }
+
+        document.querySelectorAll('[name="fluctuationMode"]').forEach(r => {
+            r.addEventListener('change', (e) => {
+                elUnit.textContent = e.target.value === 'percent' ? '(%)' : '(元)';
+            });
+        });
+
+        configForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(configForm);
+            const newConfig = {
+                interval: parseInt(document.getElementById('interval').value),
+                lowThreshold: parseFloat(document.getElementById('lowThreshold').value),
+                highThreshold: parseFloat(document.getElementById('highThreshold').value),
+                fluctuationThreshold: parseFloat(document.getElementById('fluctuationThreshold').value),
+                fluctuationWindow: parseFloat(document.getElementById('fluctuationWindow').value),
+                fluctuationMode: formData.get('fluctuationMode'),
+                alertChannel: formData.get('alertChannel'),
+                barkUrl: document.getElementById('barkUrl').value.trim()
+            };
+
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newConfig)
+                });
+                const data = await res.json();
+                if (data.success) addLog('配置保存成功并已实时生效');
+                else addLog('配置保存失败', 'alert');
+            } catch (err) {
+                addLog('网络请求异常', 'alert');
+            }
+        });
+
+        document.getElementById('test-bark').addEventListener('click', async () => {
+            const url = document.getElementById('barkUrl').value.trim();
+            addLog('正在发起 Bark 测试请求...');
+            try {
+                const res = await fetch('/api/test-bark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                const data = await res.json();
+                if (data.success) addLog('测试通知已发出，请检查手机');
+                else addLog(`测试失败: ${data.message}`, 'alert');
+            } catch (err) {
+                addLog('网络异常: ' + err.message, 'alert');
+            }
+        });
+
+        // Init
+        fetch('/api/price').then(r => r.json()).then(j => {
+            if(j.success && j.data) {
+                updateAll(j.data);
+                addLog('初始数据加载成功');
+            }
+        });
+    </script>
+</body>
+</html>
