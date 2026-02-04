@@ -53,16 +53,20 @@ function updateCard(cardId, data, elements) {
     if (!card) return;
 
     // 1. Set Prices and Changes (Fixed to 2 decimals)
-    if (elements.price) elements.price.textContent = parseFloat(data.price).toFixed(2);
-    if (elements.change) elements.change.textContent = (data.change >= 0 ? '+' : '') + parseFloat(data.change).toFixed(2);
-    if (elements.percent) elements.percent.textContent = (data.changePercent >= 0 ? '+' : '') + parseFloat(data.changePercent).toFixed(2) + '%';
+    const setVal = (el, val, prefix = '') => {
+        if (!el) return;
+        const num = parseFloat(val);
+        el.textContent = isNaN(num) ? '--.--' : (prefix + num.toFixed(2));
+    };
+
+    setVal(elements.price, data.price);
+    setVal(elements.change, data.change, data.change >= 0 ? '+' : '');
+    setVal(elements.percent, data.changePercent, data.changePercent >= 0 ? '+' : '');
 
     // 2. Set Grid Info
     if (elements.grid) {
         for (const [key, el] of Object.entries(elements.grid)) {
-            if (el && data[key] !== undefined) {
-                el.textContent = parseFloat(data[key]).toFixed(2);
-            }
+            if (el) setVal(el, data[key]);
         }
     }
 
@@ -122,6 +126,7 @@ function updatePriceUI(data) {
                 sell: document.getElementById('cmb-sell'),
                 high: document.getElementById('cmb-high'),
                 low: document.getElementById('cmb-low'),
+                close: document.getElementById('cmb-close'),
             }
         });
         document.getElementById('cmb-time').textContent = `更新: ${data.cmb.time || '--'}`;
@@ -138,6 +143,7 @@ function updatePriceUI(data) {
                 sell: document.getElementById('ccb-sell'),
                 high: document.getElementById('ccb-high'),
                 low: document.getElementById('ccb-low'),
+                close: document.getElementById('ccb-close'),
             }
         });
         document.getElementById('ccb-time').textContent = `更新: ${data.ccb.time|| '--'}`;

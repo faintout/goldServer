@@ -23,15 +23,32 @@ module.exports = async (config, saveConfig) => {
             const time = response.data.data.NowTime
             if (marketData) {
                 const currentPrice = parseFloat(marketData.zBuyPrc);
+                const change = parseFloat(marketData.zDvlCur) || 0;
+                const calculatedPrevClose = currentPrice - change;
                 
                 // Update High/Low
                 if (!config.priceStats) config.priceStats = {};
-                if (!config.priceStats.cmb) config.priceStats.cmb = { high: 0, low: 9999, date: '' };
+                if (!config.priceStats.cmb) config.priceStats.cmb = {};
                 
                 const stats = config.priceStats.cmb;
-                const today = new Date().toLocaleDateString();
+                // 确保新字段存在
+                if (stats.high === undefined) stats.high = 0;
+                if (stats.low === undefined) stats.low = 9999;
+                if (stats.date === undefined) stats.date = '';
+                if (stats.prevClose === undefined) stats.prevClose = 0;
+                if (stats.prevHigh === undefined) stats.prevHigh = 0;
+                if (stats.prevLow === undefined) stats.prevLow = 0;
+
+                const d = new Date();
+                const today = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
                 
                 if (stats.date !== today) {
+                    // 今日第一次运行或跨天：存档昨日数据
+                    if (stats.high !== 0) stats.prevHigh = stats.high;
+                    if (stats.low !== 9999) stats.prevLow = stats.low;
+                    // 使用反向计算出的基准作为昨收存档
+                    stats.prevClose = calculatedPrevClose;
+
                     stats.high = currentPrice;
                     stats.low = currentPrice;
                     stats.date = today;
@@ -40,6 +57,8 @@ module.exports = async (config, saveConfig) => {
                     let changed = false;
                     if (currentPrice > stats.high) { stats.high = currentPrice; changed = true; }
                     if (currentPrice < stats.low) { stats.low = currentPrice; changed = true; }
+                    // 即使日期没变，为了保证基准价准确（防止API修正），也可以同步一下昨收。
+                    // 但通常跨天存档一次即可。我们始终以 calculatedPrevClose 作为实时昨收展示。
                     if (changed) saveConfig();
                 }
 
@@ -50,7 +69,7 @@ module.exports = async (config, saveConfig) => {
                     high: stats.high,
                     low: stats.low,
                     open: null,
-                    close: marketData.zPrvPrc,
+                    close: calculatedPrevClose, // 动态计算出的昨日收盘价
                     change: marketData.zDvlCur,
                     changePercent: marketData.zPrcDif,
                     time: time ? time.split(' ')[1] : '--:--:--',

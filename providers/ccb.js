@@ -38,14 +38,29 @@ module.exports = async (agent, config, saveConfig) => {
             if (data && data.Cst_Buy_Prc) {
                 const currentPrice = parseFloat(data.Cst_Buy_Prc);
                 
-                // 3. Update High/Low from config
+                // 3. Update High/Low and LastPrice from config
                 if (!config.priceStats) config.priceStats = {};
-                if (!config.priceStats.ccb) config.priceStats.ccb = { high: 0, low: 9999, date: '' };
+                if (!config.priceStats.ccb) config.priceStats.ccb = {};
                 
                 const stats = config.priceStats.ccb;
-                const today = new Date().toLocaleDateString();
+                // 确保新字段存在
+                if (stats.high === undefined) stats.high = 0;
+                if (stats.low === undefined) stats.low = 9999;
+                if (stats.date === undefined) stats.date = '';
+                if (stats.prevClose === undefined) stats.prevClose = 0;
+                if (stats.prevHigh === undefined) stats.prevHigh = 0;
+                if (stats.prevLow === undefined) stats.prevLow = 0;
+                if (stats.lastPrice === undefined) stats.lastPrice = 0;
+                
+                const d = new Date();
+                const today = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
                 
                 if (stats.date !== today) {
+                    // 今日第一次运行或跨天：存档昨日数据
+                    if (stats.lastPrice) stats.prevClose = stats.lastPrice;
+                    if (stats.high !== 0) stats.prevHigh = stats.high;
+                    if (stats.low !== 9999) stats.prevLow = stats.low;
+
                     stats.high = currentPrice;
                     stats.low = currentPrice;
                     stats.date = today;
@@ -57,6 +72,20 @@ module.exports = async (agent, config, saveConfig) => {
                     if (changed) saveConfig();
                 }
 
+                // 实时更新当前最后价格（用于跨天存档）
+                if (stats.lastPrice !== currentPrice) {
+                    stats.lastPrice = currentPrice;
+                    saveConfig();
+                }
+
+                // 4. Calculate change based on prevClose
+                let change = 0;
+                let changePercent = 0;
+                if (stats.prevClose) {
+                    change = currentPrice - stats.prevClose;
+                    changePercent = (change / stats.prevClose) * 100;
+                }
+
                 return {
                     price: currentPrice,
                     buy: data.Cst_Buy_Prc,
@@ -64,9 +93,9 @@ module.exports = async (agent, config, saveConfig) => {
                     high: stats.high,
                     low: stats.low,
                     open: null,
-                    close: null,
-                    change: 0,
-                    changePercent: 0,
+                    close: stats.prevClose || null, // 展示昨日最后价格
+                    change: change,
+                    changePercent: changePercent,
                     time: data.Tms ? data.Tms.split(' ')[1].split('.')[0] : '--:--:--',
                     timestamp: Date.now(),
                     raw: data
