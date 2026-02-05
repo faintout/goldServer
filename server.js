@@ -229,49 +229,54 @@ function throttleAlert(title, body, bankId) {
 }
 
 // Scheduling
+// Core Price Fetcher
+async function fetchAndProcessAll() {
+    try {
+        const [cmbRaw, intlRaw, ccbRaw] = await Promise.all([
+            cmbProvider(config, saveConfig),
+            intlProvider(),
+            ccbProvider(agent, config, saveConfig)
+        ]);
+
+        const combined = {};
+        if (cmbRaw) combined.cmb = processPrice(cmbRaw, 'cmb');
+        if (ccbRaw) combined.ccb = processPrice(ccbRaw, 'ccb');
+        if (intlRaw) {
+            combined.intl = {
+                usd: intlRaw.usd,
+                cny: processPrice(intlRaw.cny, 'intl')
+            };
+        }
+
+        if (Object.keys(combined).length > 0) {
+            lastCombinedPrice = combined;
+            io.emit('priceUpdate', combined);
+            
+            const logTime = `[${new Date().toLocaleTimeString()}]`;
+            let logStr = logTime;
+            if (combined.cmb) logStr += ` 招行: ${combined.cmb.price}`;
+            if (combined.ccb) logStr += ` 建行: ${combined.ccb.price}`;
+            if (combined.intl) logStr += ` 国际: ${combined.intl.usd.price} USD / ${combined.intl.cny.price} CNY`;
+            console.log(logStr);
+        }
+        return combined;
+    } catch (e) {
+        console.error('Fetcher Error:', e.message);
+        return null;
+    }
+}
+
+// Scheduling
 function startScheduler() {
     if (pollingIntervalId) clearInterval(pollingIntervalId);
     
     console.log(`启动调度任务，间隔: ${config.interval}s`);
 
     const task = async () => {
-        try {
-            const [cmbRaw, intlRaw, ccbRaw] = await Promise.all([
-                cmbProvider(config, saveConfig),
-                intlProvider(),
-                ccbProvider(agent, config, saveConfig)
-            ]);
-
-            const combined = {};
-            if (cmbRaw) combined.cmb = processPrice(cmbRaw, 'cmb');
-            if (ccbRaw) combined.ccb = processPrice(ccbRaw, 'ccb');
-            if (intlRaw) {
-                combined.intl = {
-                    usd: intlRaw.usd,
-                    cny: processPrice(intlRaw.cny, 'intl')
-                };
-            }
-
-            if (Object.keys(combined).length > 0) {
-                lastCombinedPrice = combined;
-                io.emit('priceUpdate', combined);
-                
-                // 恢复实时日志打印
-                const logTime = `[${new Date().toLocaleTimeString()}]`;
-                let logStr = logTime;
-                if (combined.cmb) logStr += ` 招行: ${combined.cmb.price}`;
-                if (combined.ccb) logStr += ` 建行: ${combined.ccb.price}`;
-                if (combined.intl) logStr += ` 国际: ${combined.intl.usd.price} USD / ${combined.intl.cny.price} CNY`;
-                console.log(logStr);
-            }
-        } catch (e) {
-            console.error('Scheduler Error:', e.message);
-        }
+        await fetchAndProcessAll();
     };
 
-    // 首次启动立即执行一次
     task();
-    
     pollingIntervalId = setInterval(task, config.interval * 1000);
 }
 
@@ -297,10 +302,16 @@ app.post('/api/config', (req, res) => {
 });
 
 app.get('/api/price', async (req, res) => {
-    if (lastCombinedPrice) {
-        res.json({ success: true, data: lastCombinedPrice });
+    // 无论缓存是否有值，只要请求到达，就立刻强制拉取一次最新数据
+    console.log('[API] 正在实时同步最新价格...');
+    const data = await fetchAndProcessAll();
+    if (data && Object.keys(data).length > 0) {
+        res.json({ success: true, data: data });
+    } else if (lastCombinedPrice) {
+        // 如果实时拉取由于网络等原因失败，降级返回最后的缓存
+        res.json({ success: true, data: lastCombinedPrice, note: 'cached' });
     } else {
-        res.json({ success: false, message: '数据正在初始化，请稍候' });
+        res.json({ success: false, message: '数据获取失败，请稍后重试' });
     }
 });
 

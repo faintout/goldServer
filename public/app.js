@@ -153,14 +153,17 @@ function updatePriceUI(data) {
 // Initial Load
 async function fetchPrice() {
     try {
+        elStatus.textContent = '实时同步中...';
         const res = await fetch('/api/price');
         const json = await res.json();
         if (json.success && json.data) {
             updatePriceUI(json.data);
-            addLog('已获取最新价格');
+            addLog('已实时同步最新价格');
         }
+        elStatus.textContent = '已连接';
     } catch (err) {
         console.error('Initial fetch failed', err);
+        elStatus.textContent = '同步失败';
     }
 }
 
