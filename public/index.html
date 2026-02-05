@@ -199,13 +199,27 @@
                         </div>
                     </div>
 
-                    <div class="form-group box-style">
-                        <label>Bark 推送链接</label>
-                        <input type="text" id="barkUrl" placeholder="https://api.day.app/YOUR_KEY/">
-                        <button type="button" id="test-bark" class="secondary-btn">测试推送</button>
+                    <div class="form-group box-style" style="grid-column: span 2;">
+                        <label>Bark 推送地址列表</label>
+                        <div id="bark-url-list" class="dynamic-list">
+                            <!-- 动态生成 -->
+                        </div>
+                        <button type="button" id="add-bark-url" class="secondary-btn" style="margin-top: 10px;">+ 添加地址</button>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group box-style">
+                            <label>重试次数</label>
+                            <input type="number" id="alertRetryCount" min="0" max="10">
+                        </div>
+                        <div class="form-group box-style">
+                            <label>重试间隔 (秒)</label>
+                            <input type="number" id="alertRetryInterval" min="1" max="60">
+                        </div>
                     </div>
 
                     <button type="submit" class="primary-btn">保存配置</button>
+                    <button type="button" id="test-bark" class="secondary-btn" style="width: 100%; margin-top: 10px;">发送全量测试通知</button>
                 </form>
             </section>
 

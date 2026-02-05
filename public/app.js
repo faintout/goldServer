@@ -190,14 +190,21 @@ socket.on('alert', (alert) => {
     addLog(`${alert.title}: ${alert.body}`, 'alert');
 });
 
-// UI Logic: Toggle Unit
-radiosMode.forEach(radio => {
-    radio.addEventListener('change', (e) => {
-        if (e.target.checked) {
-            elThresholdUnit.textContent = e.target.value === 'percent' ? '(%)' : '(元)';
-        }
-    });
-});
+const barkListContainer = document.getElementById('bark-url-list');
+const btnAddBark = document.getElementById('add-bark-url');
+
+function createBarkItem(value = '') {
+    const div = document.createElement('div');
+    div.className = 'dynamic-item';
+    div.innerHTML = `
+        <div class="box-style" style="flex:1"><input type="text" class="bark-url-input" placeholder="Bark 链接" value="${value}"></div>
+        <button type="button" class="btn-remove">X</button>
+    `;
+    div.querySelector('.btn-remove').onclick = () => div.remove();
+    barkListContainer.appendChild(div);
+}
+
+btnAddBark.onclick = () => createBarkItem();
 
 // Config Logic
 async function loadConfig() {
@@ -211,7 +218,16 @@ async function loadConfig() {
         inpHigh.value = config.highThreshold;
         inpFlucThresh.value = config.fluctuationThreshold;
         inpFlucWindow.value = config.fluctuationWindow;
-        inpBark.value = config.barkUrl || '';
+        
+        // 重试配置
+        document.getElementById('alertRetryCount').value = config.alertRetryCount || 0;
+        document.getElementById('alertRetryInterval').value = config.alertRetryInterval || 5;
+
+        // 加载列表
+        barkListContainer.innerHTML = '';
+        const urls = Array.isArray(config.barkUrl) ? config.barkUrl : (config.barkUrl ? [config.barkUrl] : []);
+        if (urls.length === 0) createBarkItem();
+        else urls.forEach(u => createBarkItem(u));
 
         // Set Radio
         const mode = config.fluctuationMode || 'percent'; // default
@@ -237,6 +253,11 @@ form.addEventListener('submit', async (e) => {
     let selectedMode = 'percent';
     radiosMode.forEach(r => { if (r.checked) selectedMode = r.value; });
 
+    // 收集地址
+    const barkUrls = Array.from(document.querySelectorAll('.bark-url-input'))
+        .map(i => i.value.trim())
+        .filter(v => v !== '');
+
     const newConfig = {
         interval: parseInt(inpInterval.value),
         lowThreshold: parseFloat(inpLow.value),
@@ -245,7 +266,9 @@ form.addEventListener('submit', async (e) => {
         fluctuationWindow: parseFloat(inpFlucWindow.value),
         fluctuationMode: selectedMode,
         alertChannel: Array.from(radiosChannel).find(r => r.checked)?.value || 'all',
-        barkUrl: inpBark.value.trim()
+        barkUrl: barkUrls,
+        alertRetryCount: parseInt(document.getElementById('alertRetryCount').value),
+        alertRetryInterval: parseInt(document.getElementById('alertRetryInterval').value)
     };
 
     try {
@@ -267,19 +290,28 @@ form.addEventListener('submit', async (e) => {
 });
 
 btnTestBark.addEventListener('click', async () => {
-    const url = inpBark.value.trim();
+    const barkUrls = Array.from(document.querySelectorAll('.bark-url-input'))
+        .map(i => i.value.trim())
+        .filter(v => v !== '');
+
+    if (barkUrls.length === 0) {
+        addLog('请先输入 Bark URL', 'alert');
+        return;
+    }
+
     addLog('正在发送测试通知...');
     try {
         const res = await fetch('/api/test-bark', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
+            body: JSON.stringify({ urls: barkUrls })
         });
         const data = await res.json();
         if (data.success) {
-            addLog('测试通知发送成功');
+            const failCount = data.results.filter(r => !r.success).length;
+            addLog(`测试完成: ${data.results.length - failCount} 成功, ${failCount} 失败`);
         } else {
-            addLog(`测试通知发送失败: ${data.message}`, 'alert');
+            addLog(`测试发送请求失败`, 'alert');
         }
     } catch (err) {
         addLog(`网络异常: ${err.message}`, 'alert');

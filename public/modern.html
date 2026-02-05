@@ -188,12 +188,25 @@
                             <input type="number" id="fluctuationWindow" step="1">
                         </div>
                         <div class="form-group full">
-                            <label>Bark 推送链接</label>
-                            <input type="text" id="barkUrl" placeholder="https://api.day.app/YOUR_KEY/">
+                            <label>Bark 推送地址列表</label>
+                            <div id="bark-url-list" class="dynamic-list">
+                                <!-- 动态插入 -->
+                            </div>
+                            <button type="button" id="add-bark-url" class="btn-secondary" style="width: auto; margin-top: 10px;">+ 添加推送地址</button>
                         </div>
+
+                        <div class="form-group">
+                            <label>失败重试次数 (次)</label>
+                            <input type="number" id="alertRetryCount" min="0" max="10">
+                        </div>
+                        <div class="form-group">
+                            <label>重试间隔 (秒)</label>
+                            <input type="number" id="alertRetryInterval" min="1" max="60">
+                        </div>
+
                         <div class="form-group full btn-group">
                             <button type="submit" class="btn-primary">保存并应用配置</button>
-                            <button type="button" id="test-bark" class="btn-secondary">测试 Bark 通道</button>
+                            <button type="button" id="test-bark" class="btn-secondary">测试全量推送</button>
                         </div>
                     </form>
                 </section>
@@ -337,6 +350,22 @@
             addLog('服务器连接已断开', 'alert');
         });
 
+        const barkListContainer = document.getElementById('bark-url-list');
+        const btnAddBark = document.getElementById('add-bark-url');
+
+        function createBarkItem(value = '') {
+            const div = document.createElement('div');
+            div.className = 'dynamic-item';
+            div.innerHTML = `
+                <input type="text" class="bark-url-input" placeholder="https://api.day.app/Key" value="${value}">
+                <button type="button" class="btn-remove">移除</button>
+            `;
+            div.querySelector('.btn-remove').onclick = () => div.remove();
+            barkListContainer.appendChild(div);
+        }
+
+        btnAddBark.onclick = () => createBarkItem();
+
         // Config Management
         async function loadConfig() {
             try {
@@ -348,7 +377,16 @@
                 document.getElementById('highThreshold').value = config.highThreshold;
                 document.getElementById('fluctuationThreshold').value = config.fluctuationThreshold;
                 document.getElementById('fluctuationWindow').value = config.fluctuationWindow;
-                document.getElementById('barkUrl').value = config.barkUrl || '';
+                
+                // 重试配置
+                document.getElementById('alertRetryCount').value = config.alertRetryCount || 0;
+                document.getElementById('alertRetryInterval').value = config.alertRetryInterval || 5;
+
+                // 加载地址列表
+                barkListContainer.innerHTML = '';
+                const urls = Array.isArray(config.barkUrl) ? config.barkUrl : (config.barkUrl ? [config.barkUrl] : []);
+                if (urls.length === 0) createBarkItem(); // 默认显示一个空行
+                else urls.forEach(u => createBarkItem(u));
 
                 const mode = config.fluctuationMode || 'percent';
                 document.querySelectorAll('[name="fluctuationMode"]').forEach(r => r.checked = r.value === mode);
@@ -372,6 +410,12 @@
         configForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(configForm);
+            
+            // 收集所有有效的 Bark URL
+            const barkUrls = Array.from(document.querySelectorAll('.bark-url-input'))
+                .map(i => i.value.trim())
+                .filter(v => v !== '');
+
             const newConfig = {
                 interval: parseInt(document.getElementById('interval').value),
                 lowThreshold: parseFloat(document.getElementById('lowThreshold').value),
@@ -380,7 +424,9 @@
                 fluctuationWindow: parseFloat(document.getElementById('fluctuationWindow').value),
                 fluctuationMode: formData.get('fluctuationMode'),
                 alertChannel: formData.get('alertChannel'),
-                barkUrl: document.getElementById('barkUrl').value.trim()
+                barkUrl: barkUrls,
+                alertRetryCount: parseInt(document.getElementById('alertRetryCount').value),
+                alertRetryInterval: parseInt(document.getElementById('alertRetryInterval').value)
             };
 
             try {
@@ -398,17 +444,30 @@
         });
 
         document.getElementById('test-bark').addEventListener('click', async () => {
-            const url = document.getElementById('barkUrl').value.trim();
-            addLog('正在发起 Bark 测试请求...');
+            const barkUrls = Array.from(document.querySelectorAll('.bark-url-input'))
+                .map(i => i.value.trim())
+                .filter(v => v !== '');
+
+            if (barkUrls.length === 0) {
+                addLog('请至少配置一个推送地址', 'alert');
+                return;
+            }
+
+            addLog('正在发起多地址测试推送...');
             try {
                 const res = await fetch('/api/test-bark', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url })
+                    body: JSON.stringify({ urls: barkUrls })
                 });
                 const data = await res.json();
-                if (data.success) addLog('测试通知已发出，请检查手机');
-                else addLog(`测试失败: ${data.message}`, 'alert');
+                if (data.success && data.results) {
+                    const failCount = data.results.filter(r => !r.success).length;
+                    if (failCount === 0) addLog(`测试推送完成，全部 ${data.results.length} 个地址已送达`);
+                    else addLog(`测试推送完成，${data.results.length - failCount} 成功，${failCount} 失败`, 'alert');
+                } else {
+                    addLog(`测试请求异常: ${data.message}`, 'alert');
+                }
             } catch (err) {
                 addLog('网络异常: ' + err.message, 'alert');
             }

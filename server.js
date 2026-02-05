@@ -70,31 +70,49 @@ function loadConfig() {
 // Save Config
 function saveConfig() {
     try {
+        // 确保 barkUrl 始终为数组
+        if (typeof config.barkUrl === 'string') {
+            config.barkUrl = config.barkUrl ? [config.barkUrl] : [];
+        }
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-        // console.log('配置已保存');
     } catch (err) {
         console.error('保存配置失败:', err);
     }
 }
 
-// Bark Notification
-async function sendBarkNotification(title, body) {
-    if (!config.barkUrl) return;
-    
-    let url = config.barkUrl;
-    if (!url.endsWith('/')) url += '/';
-    
-    const encodedTitle = encodeURIComponent(title);
-    const encodedBody = encodeURIComponent(body);
-    
-    const fullUrl = `${url}${encodedTitle}/${encodedBody}?group=GoldMonitor`;
+// Helper: Sleep
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    try {
-        await axios.get(fullUrl);
-        console.log(`Bark 通知已发送: ${title}`);
-    } catch (err) {
-        console.error('Bark 通知发送失败:', err.message);
-    }
+// Bark Notification (Enhanced with Multi-URL and Retry)
+async function sendBarkNotification(title, body) {
+    const urls = Array.isArray(config.barkUrl) ? config.barkUrl : (config.barkUrl ? [config.barkUrl] : []);
+    if (urls.length === 0) return;
+
+    const retryCount = parseInt(config.alertRetryCount) || 0;
+    const retryInterval = (parseInt(config.alertRetryInterval) || 5) * 1000;
+
+    const sendToSingle = async (baseUrl) => {
+        let url = baseUrl.trim();
+        if (!url) return;
+        if (!url.endsWith('/')) url += '/';
+        
+        const fullUrl = `${url}${encodeURIComponent(title)}/${encodeURIComponent(body)}?group=GoldMonitor`;
+
+        for (let attempt = 0; attempt <= retryCount; attempt++) {
+            try {
+                await axios.get(fullUrl);
+                console.log(`Bark 通知已发送 [尝试 ${attempt + 1}]: ${baseUrl}`);
+                return true;
+            } catch (err) {
+                console.error(`Bark 通知发送失败 [尝试 ${attempt + 1}/${retryCount + 1}]: ${baseUrl} - ${err.message}`);
+                if (attempt < retryCount) await sleep(retryInterval);
+            }
+        }
+        return false;
+    };
+
+    // 并行发送到所有地址
+    await Promise.allSettled(urls.map(u => sendToSingle(u)));
 }
 
 // Obfuscation Helper
@@ -316,26 +334,35 @@ app.get('/api/price', async (req, res) => {
 });
 
 app.post('/api/test-bark', async (req, res) => {
-    const { url } = req.body;
-    const originalUrl = config.barkUrl;
-    
-    // Temporarily use the provided URL to test, or config one if empty
-    if (url) {
-        const tempConfig = { ...config, barkUrl: url };
-        // We don't save this yet, just for testing the function logic or we pass to helper
-        // But helper uses global config. Let's just update global temp? 
-        // Better: allow passing url to helper but helper relies on global.
-        // Let's just use the logic directly here for test.
-        
-        let targetUrl = url;
+    const { urls } = req.body;
+    const retryCount = parseInt(config.alertRetryCount) || 0;
+    const retryInterval = (parseInt(config.alertRetryInterval) || 5) * 1000;
+
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+        return res.status(400).json({ success: false, message: '无效的测试地址' });
+    }
+
+    const testSingle = async (baseUrl) => {
+        let targetUrl = baseUrl.trim();
         if (!targetUrl.endsWith('/')) targetUrl += '/';
         const fullUrl = `${targetUrl}测试通知/这是一条来自黄金监控的测试消息?group=GoldMonitor`;
-        try {
-            await axios.get(fullUrl);
-            res.json({ success: true, message: '发送成功' });
-        } catch (err) {
-            res.status(500).json({ success: false, message: err.message });
+        
+        for (let attempt = 0; attempt <= retryCount; attempt++) {
+            try {
+                await axios.get(fullUrl);
+                return { url: baseUrl, success: true };
+            } catch (err) {
+                if (attempt < retryCount) await sleep(retryInterval);
+                else return { url: baseUrl, success: false, message: err.message };
+            }
         }
+    };
+
+    try {
+        const results = await Promise.all(urls.map(u => testSingle(u)));
+        res.json({ success: true, results });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 
