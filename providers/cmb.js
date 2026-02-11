@@ -42,11 +42,19 @@ module.exports = async (config, saveConfig) => {
                 const d = new Date();
                 const today = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
                 
-                if (stats.date !== today) {
-                    // 今日第一次运行或跨天：存档昨日数据
+                if (stats.date === '') {
+                    // 初次运行（新系统）：仅记录今日状态，不归档昨日
+                    stats.high = currentPrice;
+                    stats.low = currentPrice;
+                    stats.date = today;
+                    console.log('[CMB] 初次运行，初始化今日价格统计基准');
+                    saveConfig();
+                } else if (stats.date !== today) {
+                    // 确认跨天：执行昨日归档结算
+                    console.log(`[CMB] 监测到日期更替 (${stats.date} -> ${today})，执行每日结算...`);
+                    
                     if (stats.high !== 0) stats.prevHigh = stats.high;
                     if (stats.low !== 9999) stats.prevLow = stats.low;
-                    // 使用反向计算出的基准作为昨收存档
                     stats.prevClose = calculatedPrevClose;
 
                     stats.high = currentPrice;

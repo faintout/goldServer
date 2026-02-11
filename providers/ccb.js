@@ -55,12 +55,22 @@ module.exports = async (agent, config, saveConfig) => {
                 const d = new Date();
                 const today = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
                 
-                if (stats.date !== today) {
-                    // 今日第一次运行或跨天：存档昨日数据
+                if (stats.date === '') {
+                    // 初次运行（新系统）：仅记录今日日期，不执行归档
+                    stats.high = currentPrice;
+                    stats.low = currentPrice;
+                    stats.date = today;
+                    console.log('[CCB] 初次运行，初始化今日价格统计基准');
+                    saveConfig();
+                } else if (stats.date !== today) {
+                    // 确认跨天：执行昨日数据归档
+                    console.log(`[CCB] 监测到日期更替 (${stats.date} -> ${today})，执行每日结算...`);
+                    
                     if (stats.lastPrice) stats.prevClose = stats.lastPrice;
                     if (stats.high !== 0) stats.prevHigh = stats.high;
                     if (stats.low !== 9999) stats.prevLow = stats.low;
 
+                    // 重置今日统计
                     stats.high = currentPrice;
                     stats.low = currentPrice;
                     stats.date = today;
