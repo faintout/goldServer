@@ -1,0 +1,34 @@
+{
+  "interval": 30,
+  "lowThreshold": 1000,
+  "highThreshold": 1150,
+  "fluctuationThreshold": 10,
+  "fluctuationWindow": 30,
+  "barkUrl": [
+    ""
+  ],
+  "fluctuationMode": "value",
+  "priceStats": {
+    "cmb": {
+      "high": 1127.78,
+      "low": 1082.05,
+      "date": "2026/2/5",
+      "prevClose": 1109.98,
+      "prevHigh": 1142.62,
+      "prevLow": 1103.55
+    },
+    "ccb": {
+      "high": 1134.86,
+      "low": 1084.17,
+      "date": "2026/2/5",
+      "prevClose": 1111.17,
+      "prevHigh": 1143.63,
+      "prevLow": 1104,
+      "lastPrice": 1108.35
+    }
+  },
+  "ccbCookies": "",
+  "alertChannel": "cmb",
+  "alertRetryCount": 3,
+  "alertRetryInterval": 5
+}
